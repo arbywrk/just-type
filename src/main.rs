@@ -10,7 +10,41 @@
 // Once the timer is done the game is over and it will change to a stats screen,
 // the stats screen will show the avrage WPM
 // and will have a button for playing again.
+use std::time::Duration;
 
-fn main() {
-    println!("Hello, world!");
+use iced::{
+    widget::{column, text},
+    Element, Subscription,
+};
+
+#[derive(Debug, Clone)]
+enum Message {
+    Tick,
+}
+
+#[derive(Default)]
+struct App {
+    value: i64,
+}
+
+impl App {
+    fn update(&mut self, message: Message) {
+        match message {
+            Message::Tick => self.value += 1,
+        }
+    }
+
+    fn view(&self) -> Element<'_, Message> {
+        column![text(self.value.to_string())].into()
+    }
+
+    fn subscription(&self) -> Subscription<Message> {
+        iced::time::every(Duration::from_secs(1)).map(|_| Message::Tick)
+    }
+}
+
+fn main() -> iced::Result {
+    iced::application(App::default, App::update, App::view)
+        .subscription(App::subscription)
+        .run()
 }
