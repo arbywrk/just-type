@@ -25,12 +25,20 @@ enum Message {
 #[derive(Default)]
 struct App {
     value: i64,
+    game_over: bool,
 }
 
 impl App {
     fn update(&mut self, message: Message) {
         match message {
-            Message::Tick => self.value += 1,
+            Message::Tick => {
+                self.value += 1;
+
+                if self.value == 15 {
+                    self.game_over = true;
+                }
+            },
+
         }
     }
 
@@ -39,7 +47,11 @@ impl App {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        iced::time::every(Duration::from_secs(1)).map(|_| Message::Tick)
+        if self.game_over {
+            Subscription::none()
+        } else {
+            iced::time::every(Duration::from_secs(1)).map(|_| Message::Tick)
+        }
     }
 }
 
