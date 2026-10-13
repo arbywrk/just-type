@@ -12,22 +12,36 @@
 // and will have a button for playing again.
 use std::time::Duration;
 
-use iced::{
-    widget::{column, text},
-    Element, Subscription,
-};
+use iced::widget::{column, rich_text, span, text};
+use iced::{Color, Element, Subscription, keyboard};
 
-const TEXT: &str = "The quick brown fox jumps over the lazy dog";
+const TEXT: &str = "The quick brown fox jumps over the lazy dog The quick brown fox jumps over the lazy dog The quick brown fox jumps over the lazy dog";
+
+enum InputResult {
+    Correct,
+    Wrong,
+}
+
+impl From<bool> for InputResult {
+    fn from(value: bool) -> Self {
+        match value {
+            true => Self::Correct,
+            false => Self::Wrong,
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 enum Message {
     Tick,
+    Input(char),
 }
 
-#[derive(Default)]
 struct App {
     value: i64,
     game_over: bool,
+    text: Vec<char>,
+    results: Vec<InputResult>,
 }
 
 impl App {
@@ -35,24 +49,68 @@ impl App {
         match message {
             Message::Tick => {
                 self.value += 1;
-
                 if self.value == 15 {
                     self.game_over = true;
                 }
-            },
-
+            }
+            Message::Input(c) => {
+                if self.game_over {
+                    return;
+                }
+                if let Some(expected) = self.text.get(self.results.len()) {
+                    self.results.push((c == *expected).into());
+                }
+            }
         }
     }
 
     fn view(&self) -> Element<'_, Message> {
-        column![text(self.value.to_string()), text(TEXT)].into()
+        let spans: Vec<iced::widget::text::Span<'_, ()>> = self
+            .text
+            .iter()
+            .enumerate()
+            .map(|(i, c)| {
+                let color = match self.results.get(i) {
+                    Some(InputResult::Correct) => Color::from_rgb(0.0, 0.8, 0.0),
+                    Some(InputResult::Wrong) => Color::from_rgb(0.9, 0.1, 0.1),
+                    None => Color::from_rgb(0.55, 0.55, 0.55),
+                };
+                span(c.to_string()).color(color)
+            })
+            .collect();
+
+        column![text(self.value.to_string()), rich_text(spans)].into()
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        if self.game_over {
+        let tick = if self.game_over {
             Subscription::none()
         } else {
             iced::time::every(Duration::from_secs(1)).map(|_| Message::Tick)
+        };
+
+        let keyboard = if self.game_over {
+            Subscription::none()
+        } else {
+            keyboard::listen().filter_map(|event| match event {
+                keyboard::Event::KeyPressed { text: Some(t), .. } => {
+                    t.chars().next().map(Message::Input)
+                }
+                _ => None,
+            })
+        };
+
+        Subscription::batch([tick, keyboard])
+    }
+}
+
+impl Default for App {
+    fn default() -> Self {
+        Self {
+            value: 0,
+            game_over: false,
+            text: TEXT.to_owned().chars().collect(),
+            results: vec![],
         }
     }
 }
