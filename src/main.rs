@@ -40,6 +40,7 @@ enum Message {
 struct App {
     value: i64,
     game_over: bool,
+    started: bool,
     text: Vec<char>,
     results: Vec<InputResult>,
 }
@@ -57,6 +58,7 @@ impl App {
                 if self.game_over {
                     return;
                 }
+                self.started = true;
                 if let Some(expected) = self.text.get(self.results.len()) {
                     self.results.push((c == *expected).into());
                 }
@@ -83,7 +85,7 @@ impl App {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        let tick = if self.game_over {
+        let tick = if self.game_over || !self.started {
             Subscription::none()
         } else {
             iced::time::every(Duration::from_secs(1)).map(|_| Message::Tick)
@@ -111,6 +113,7 @@ impl Default for App {
             game_over: false,
             text: TEXT.to_owned().chars().collect(),
             results: vec![],
+            started: false,
         }
     }
 }
