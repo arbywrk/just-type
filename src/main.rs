@@ -17,6 +17,8 @@ use iced::{
     Element, Subscription,
 };
 
+const TEXT: &str = "The quick brown fox jumps over the lazy dog";
+
 #[derive(Debug, Clone)]
 enum Message {
     Tick,
@@ -43,7 +45,7 @@ impl App {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        column![text(self.value.to_string())].into()
+        column![text(self.value.to_string()), text(TEXT)].into()
     }
 
     fn subscription(&self) -> Subscription<Message> {
