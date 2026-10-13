@@ -1,19 +1,20 @@
-// I want to build a typeing game
+// I want to build a typing game
 //
 // The game (MVP):
 // It will show an infinit text (done).
-// Once the player starts typeing the text a countdown for 15 seconds will start.
+// Once the player starts typing the text a countdown for 15 seconds will start (done).
 // When a letter is written it will be colored with:
-// - white if the input was correct
-// - red if the input was incorrect (it will not show the actually typped letter at the moment)
+// - white if the input was correct (done)
+// - red if the input was incorrect (it will not show the actually typped letter at the moment) (done)
 //
-// Once the timer is done the game is over and it will change to a stats screen,
-// the stats screen will show the avrage WPM
-// and will have a button for playing again.
+// Once the timer is done the game is over and it will change to a stats screen (done),
+// the stats screen will show the avrage WPM (done)
+// and will have a button for playing again (done).
 use std::time::Duration;
 
 use iced::widget::{column, rich_text, span, text};
 use iced::{Color, Element, Subscription, keyboard};
+use iced::widget::{radio, row};
 
 use std::sync::LazyLock;
 use serde::Deserialize;
@@ -35,6 +36,7 @@ static WORDS: LazyLock<Vec<String>> = LazyLock::new(|| {
     lang.words
 });
 
+#[derive(Eq, PartialEq)]
 enum InputResult {
     Correct,
     Wrong,
@@ -56,10 +58,12 @@ enum Message {
     Restart,
     Start,
     UpdateTime(u32),
+    Continue,
 }
 
 struct Game {
     time: u32,
+    duration: u32,
     menu: bool,
     game_over: bool,
     started: bool,
@@ -83,10 +87,41 @@ fn extend_text(text: &mut Vec<char>, min_len: usize) {
     }
 }
 
+struct Score {
+    raw_wpm: f64,
+    net_wpm: f64,
+    accuracy: f64,
+}
+
+fn wpm(chars: usize, elapsed: std::time::Duration) -> f64 {
+    let minutes = elapsed.as_secs_f64() / 60.0;
+    if minutes == 0.0 {
+        return 0.0;
+    }
+    (chars as f64 / 5.0) / minutes
+}
+
+fn compute_score(total_typed: usize, correct_typed: usize, elapsed: std::time::Duration) -> Score {
+    let raw_wpm = wpm(total_typed, elapsed);
+    let net_wpm = wpm(correct_typed, elapsed);
+    let accuracy = if total_typed > 0 {
+        correct_typed as f64 / total_typed as f64 * 100.0
+    } else {
+        100.0
+    };
+
+    Score {
+        raw_wpm,
+        net_wpm,
+        accuracy,
+    }
+}
+
 impl Game {
     fn boot() -> Self {
         Self {
             time: RAMI_TIME.into(),
+            duration: RAMI_TIME.into(),
             game_over: false,
             text: vec![],
             results: vec![],
@@ -122,18 +157,35 @@ impl Game {
             Message::Start => {
                 self.menu = false;
 
+                self.text = vec![];
+                self.results = vec![];
+
                 extend_text(&mut self.text, 200);
             },
             Message::UpdateTime(t) => {
                 self.time = t;
+                self.duration = t;
+            },
+            Message::Continue => {
+                self.game_over = false;
+                self.started = false;
+                self.menu = true;
             },
         }
     }
 
     fn view(&self) -> Element<'_, Message> {
-        if self.menu {
-            use iced::widget::{radio, row};
+        if self.game_over && self.started {
+            let score = compute_score(self.results.len(), self.results.iter().map(|b| if *b == InputResult::Correct { 1 } else { 0 }).sum(), std::time::Duration::from_secs(self.duration.into()));
+            let raw: Element<Message> = text(format!("Raw: {:.2} wpm", score.raw_wpm)).into();
+            let net: Element<Message> = text(format!("Net: {:.2} wpm", score.net_wpm)).into();
+            let accuracy: Element<Message> = text(format!("Accuracy: {:.2} %", score.accuracy)).into();
 
+            let button = iced::widget::button("Continue").on_press(Message::Continue);
+
+            return column![row![raw, net, accuracy].spacing(10), button].into();
+        }
+        if self.menu {
             let time_option: Element<Message> = row![
                 radio("15s", 15, Some(self.time), Message::UpdateTime),
                 radio("30s", 30, Some(self.time), Message::UpdateTime),
@@ -147,7 +199,7 @@ impl Game {
         }
 
         let info: iced::Element<Message> = if !self.started {
-            iced::widget::text("The game will start when you start typeing.").into()
+            iced::widget::text("The game will start when you start typing.").into()
         } else {
             iced::widget::space().into()
         };
