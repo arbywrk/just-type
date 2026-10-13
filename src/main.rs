@@ -1,7 +1,7 @@
 // I want to build a typeing game
 //
 // The game (MVP):
-// It will show an infinit text.
+// It will show an infinit text (done).
 // Once the player starts typeing the text a countdown for 15 seconds will start.
 // When a letter is written it will be colored with:
 // - white if the input was correct
@@ -15,7 +15,25 @@ use std::time::Duration;
 use iced::widget::{column, rich_text, span, text};
 use iced::{Color, Element, Subscription, keyboard};
 
-const TEXT: &str = "The quick brown fox jumps over the lazy dog The quick brown fox jumps over the lazy dog The quick brown fox jumps over the lazy dog";
+use std::sync::LazyLock;
+use serde::Deserialize;
+
+const RAMI_TIME: u8 = 20;
+
+#[derive(Deserialize)]
+struct Language {
+    words: Vec<String>,
+}
+
+static WORDS: LazyLock<Vec<String>> = LazyLock::new(|| {
+    let lang: Language = serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/resources/languages/english.json"
+    )))
+    .expect("failed to parse english.json");
+
+    lang.words
+});
 
 enum InputResult {
     Correct,
@@ -36,17 +54,47 @@ enum Message {
     Tick,
     Input(char),
     Restart,
+    Start,
+    UpdateTime(u32),
 }
 
 struct Game {
-    time: i64,
+    time: u32,
+    menu: bool,
     game_over: bool,
     started: bool,
     text: Vec<char>,
     results: Vec<InputResult>,
 }
 
+use rand::seq::IndexedRandom;
+
+/// Appends random space-separated words until `text` has at least `min_len` chars.
+fn extend_text(text: &mut Vec<char>, min_len: usize) {
+    let mut rng = rand::rng();
+
+    while text.len() < min_len {
+        let word = WORDS.choose(&mut rng).expect("word list is empty");
+
+        if !text.is_empty() {
+            text.push(' ');
+        }
+        text.extend(word.chars());
+    }
+}
+
 impl Game {
+    fn boot() -> Self {
+        Self {
+            time: RAMI_TIME.into(),
+            game_over: false,
+            text: vec![],
+            results: vec![],
+            started: false,
+            menu: true,
+        }
+    }
+
     fn update(&mut self, message: Message) {
         match message {
             Message::Tick => {
@@ -63,17 +111,47 @@ impl Game {
                 if let Some(expected) = self.text.get(self.results.len()) {
                     self.results.push((c == *expected).into());
                 }
+                extend_text(&mut self.text, self.results.len() + 200);
             }
             Message::Restart => {
-                self.time = 15;
+                self.time = RAMI_TIME.into();
                 self.game_over = false;
                 self.started = false;
                 self.results = vec![];
+            },
+            Message::Start => {
+                self.menu = false;
+
+                extend_text(&mut self.text, 200);
+            },
+            Message::UpdateTime(t) => {
+                self.time = t;
             },
         }
     }
 
     fn view(&self) -> Element<'_, Message> {
+        if self.menu {
+            use iced::widget::{radio, row};
+
+            let time_option: Element<Message> = row![
+                radio("15s", 15, Some(self.time), Message::UpdateTime),
+                radio("30s", 30, Some(self.time), Message::UpdateTime),
+                radio("60s", 60, Some(self.time), Message::UpdateTime),
+            ]
+            .spacing(10).into();
+
+            let button = iced::widget::button("Start").on_press(Message::Start);
+
+            return column![time_option, button].into();
+        }
+
+        let info: iced::Element<Message> = if !self.started {
+            iced::widget::text("The game will start when you start typeing.").into()
+        } else {
+            iced::widget::space().into()
+        };
+
         let spans: Vec<iced::widget::text::Span<'_, ()>> = self
             .text
             .iter()
@@ -94,7 +172,7 @@ impl Game {
             iced::widget::space().into()
         };
 
-        column![text(self.time.to_string()), rich_text(spans), button].into()
+        column![info, text(self.time.to_string()), rich_text(spans), button].into()
     }
 
     fn subscription(&self) -> Subscription<Message> {
@@ -119,20 +197,8 @@ impl Game {
     }
 }
 
-impl Default for Game {
-    fn default() -> Self {
-        Self {
-            time: 15,
-            game_over: false,
-            text: TEXT.to_owned().chars().collect(),
-            results: vec![],
-            started: false,
-        }
-    }
-}
-
 fn main() -> iced::Result {
-    iced::application(Game::default, Game::update, Game::view)
+    iced::application(Game::boot, Game::update, Game::view)
         .subscription(Game::subscription)
         .run()
 }
