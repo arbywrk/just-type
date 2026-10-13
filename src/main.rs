@@ -1,7 +1,7 @@
 // I want to build a typeing game
 //
 // The game (MVP):
-// It will show an infinit text (beautifully formatted for fast reading, mutted grey collor).
+// It will show an infinit text.
 // Once the player starts typeing the text a countdown for 15 seconds will start.
 // When a letter is written it will be colored with:
 // - white if the input was correct
@@ -38,7 +38,7 @@ enum Message {
     Restart,
 }
 
-struct App {
+struct Game {
     time: i64,
     game_over: bool,
     started: bool,
@@ -46,7 +46,7 @@ struct App {
     results: Vec<InputResult>,
 }
 
-impl App {
+impl Game {
     fn update(&mut self, message: Message) {
         match message {
             Message::Tick => {
@@ -119,7 +119,7 @@ impl App {
     }
 }
 
-impl Default for App {
+impl Default for Game {
     fn default() -> Self {
         Self {
             time: 15,
@@ -132,7 +132,7 @@ impl Default for App {
 }
 
 fn main() -> iced::Result {
-    iced::application(App::default, App::update, App::view)
-        .subscription(App::subscription)
+    iced::application(Game::default, Game::update, Game::view)
+        .subscription(Game::subscription)
         .run()
 }
