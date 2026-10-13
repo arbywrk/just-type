@@ -1,23 +1,11 @@
-// I want to build a typing game
-//
-// The game (MVP):
-// It will show an infinit text (done).
-// Once the player starts typing the text a countdown for 15 seconds will start (done).
-// When a letter is written it will be colored with:
-// - white if the input was correct (done)
-// - red if the input was incorrect (it will not show the actually typped letter at the moment) (done)
-//
-// Once the timer is done the game is over and it will change to a stats screen (done),
-// the stats screen will show the avrage WPM (done)
-// and will have a button for playing again (done).
-use std::time::Duration;
-
-use iced::widget::{column, rich_text, span, text};
-use iced::{Color, Element, Subscription, keyboard};
-use iced::widget::{radio, row};
-
-use std::sync::LazyLock;
+use iced::{
+    Color, Element, Subscription, keyboard,
+    widget::{column, radio, rich_text, row, span, text},
+};
+use rand::seq::IndexedRandom;
 use serde::Deserialize;
+use std::sync::LazyLock;
+use std::time::Duration;
 
 const RAMI_TIME: u8 = 20;
 
@@ -50,28 +38,6 @@ impl From<bool> for InputResult {
         }
     }
 }
-
-#[derive(Debug, Clone)]
-enum Message {
-    Tick,
-    Input(char),
-    Restart,
-    Start,
-    UpdateTime(u32),
-    Continue,
-}
-
-struct Game {
-    time: u32,
-    duration: u32,
-    menu: bool,
-    game_over: bool,
-    started: bool,
-    text: Vec<char>,
-    results: Vec<InputResult>,
-}
-
-use rand::seq::IndexedRandom;
 
 /// Appends random space-separated words until `text` has at least `min_len` chars.
 fn extend_text(text: &mut Vec<char>, min_len: usize) {
@@ -117,6 +83,27 @@ fn compute_score(total_typed: usize, correct_typed: usize, elapsed: std::time::D
     }
 }
 
+
+#[derive(Debug, Clone)]
+enum Message {
+    Tick,
+    Input(char),
+    Restart,
+    Start,
+    UpdateTime(u32),
+    Continue,
+}
+
+struct Game {
+    time: u32,
+    duration: u32,
+    menu: bool,
+    game_over: bool,
+    started: bool,
+    text: Vec<char>,
+    results: Vec<InputResult>,
+}
+
 impl Game {
     fn boot() -> Self {
         Self {
@@ -153,7 +140,7 @@ impl Game {
                 self.game_over = false;
                 self.started = false;
                 self.results = vec![];
-            },
+            }
             Message::Start => {
                 self.menu = false;
 
@@ -161,25 +148,33 @@ impl Game {
                 self.results = vec![];
 
                 extend_text(&mut self.text, 200);
-            },
+            }
             Message::UpdateTime(t) => {
                 self.time = t;
                 self.duration = t;
-            },
+            }
             Message::Continue => {
                 self.game_over = false;
                 self.started = false;
                 self.menu = true;
-            },
+            }
         }
     }
 
     fn view(&self) -> Element<'_, Message> {
         if self.game_over && self.started {
-            let score = compute_score(self.results.len(), self.results.iter().map(|b| if *b == InputResult::Correct { 1 } else { 0 }).sum(), std::time::Duration::from_secs(self.duration.into()));
+            let score = compute_score(
+                self.results.len(),
+                self.results
+                    .iter()
+                    .map(|b| if *b == InputResult::Correct { 1 } else { 0 })
+                    .sum(),
+                std::time::Duration::from_secs(self.duration.into()),
+            );
             let raw: Element<Message> = text(format!("Raw: {:.2} wpm", score.raw_wpm)).into();
             let net: Element<Message> = text(format!("Net: {:.2} wpm", score.net_wpm)).into();
-            let accuracy: Element<Message> = text(format!("Accuracy: {:.2} %", score.accuracy)).into();
+            let accuracy: Element<Message> =
+                text(format!("Accuracy: {:.2} %", score.accuracy)).into();
 
             let button = iced::widget::button("Continue").on_press(Message::Continue);
 
@@ -191,7 +186,8 @@ impl Game {
                 radio("30s", 30, Some(self.time), Message::UpdateTime),
                 radio("60s", 60, Some(self.time), Message::UpdateTime),
             ]
-            .spacing(10).into();
+            .spacing(10)
+            .into();
 
             let button = iced::widget::button("Start").on_press(Message::Start);
 
@@ -219,7 +215,9 @@ impl Game {
             .collect();
 
         let button: iced::Element<Message> = if self.game_over {
-            iced::widget::button("Restart").on_press(Message::Restart).into()
+            iced::widget::button("Restart")
+                .on_press(Message::Restart)
+                .into()
         } else {
             iced::widget::space().into()
         };
