@@ -35,10 +35,11 @@ impl From<bool> for InputResult {
 enum Message {
     Tick,
     Input(char),
+    Restart,
 }
 
 struct App {
-    value: i64,
+    time: i64,
     game_over: bool,
     started: bool,
     text: Vec<char>,
@@ -49,8 +50,8 @@ impl App {
     fn update(&mut self, message: Message) {
         match message {
             Message::Tick => {
-                self.value += 1;
-                if self.value == 15 {
+                self.time -= 1;
+                if self.time == 0 {
                     self.game_over = true;
                 }
             }
@@ -63,6 +64,12 @@ impl App {
                     self.results.push((c == *expected).into());
                 }
             }
+            Message::Restart => {
+                self.time = 15;
+                self.game_over = false;
+                self.started = false;
+                self.results = vec![];
+            },
         }
     }
 
@@ -81,7 +88,13 @@ impl App {
             })
             .collect();
 
-        column![text(self.value.to_string()), rich_text(spans)].into()
+        let button: iced::Element<Message> = if self.game_over {
+            iced::widget::button("Restart").on_press(Message::Restart).into()
+        } else {
+            iced::widget::space().into()
+        };
+
+        column![text(self.time.to_string()), rich_text(spans), button].into()
     }
 
     fn subscription(&self) -> Subscription<Message> {
@@ -109,7 +122,7 @@ impl App {
 impl Default for App {
     fn default() -> Self {
         Self {
-            value: 0,
+            time: 15,
             game_over: false,
             text: TEXT.to_owned().chars().collect(),
             results: vec![],
