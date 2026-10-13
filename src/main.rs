@@ -129,6 +129,11 @@ impl Game {
                 if self.game_over {
                     return;
                 }
+                if c == 8 as char {
+                    // Backspace
+                    self.results.pop();
+                    return;
+                }
                 self.started = true;
                 if let Some(expected) = self.text.get(self.results.len()) {
                     self.results.push((c == *expected).into());
