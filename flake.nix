@@ -53,6 +53,8 @@
           zenity
 
           mupdf
+
+          python3
         ];
 
         nativeBuildInputs = with pkgs; [
