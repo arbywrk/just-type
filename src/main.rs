@@ -152,6 +152,19 @@ impl Game {
         }
     }
 
+    /// Resets the round state and generates a fresh text.
+    fn new_round(&mut self) {
+        self.start_time = None;
+        self.game_over = false;
+        self.started = false;
+        self.text = vec![];
+        self.results = vec![];
+        self.keystrokes = 0;
+        self.correct_keystrokes = 0;
+
+        extend_text(&mut self.text, 200);
+    }
+
     fn update(&mut self, message: Message) {
         match message {
             Message::Tick => {
@@ -183,24 +196,11 @@ impl Game {
                 extend_text(&mut self.text, self.results.len() + 200);
             }
             Message::Restart => {
-                self.start_time = None;
-                self.game_over = false;
-                self.started = false;
-                self.results = vec![];
-                self.keystrokes = 0;
-                self.correct_keystrokes = 0;
+                self.new_round();
             }
             Message::Start => {
                 self.menu = false;
-
-                self.text = vec![];
-                self.results = vec![];
-                self.keystrokes = 0;
-                self.correct_keystrokes = 0;
-
-                extend_text(&mut self.text, 200);
-
-                self.start_time = None;
+                self.new_round();
             }
             Message::UpdateTime(choice) => {
                 self.duration_choice = choice;
