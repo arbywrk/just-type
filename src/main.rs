@@ -88,17 +88,35 @@ fn compute_score(total_typed: usize, correct_typed: usize, elapsed: std::time::D
 
 #[derive(Debug, Clone)]
 enum Message {
-    Tick,
+    Tick(std::time::Instant),
     Input(char),
     Restart,
     Start,
-    UpdateTime(u32),
+    UpdateTime(DurationChoice),
     Continue,
 }
 
+#[derive(Default, Clone, Debug, Copy, Eq, PartialEq)]
+enum DurationChoice {
+    #[default]
+    Secs15,
+    Secs30,
+    Secs60,
+}
+
+impl DurationChoice {
+    fn as_duration(self) -> Duration {
+        match self {
+            DurationChoice::Secs15 => Duration::from_secs(15),
+            DurationChoice::Secs30 => Duration::from_secs(30),
+            DurationChoice::Secs60 => Duration::from_secs(60),
+        }
+    }
+}
+
 struct Game {
-    time: u32,
-    duration: u32,
+    time: Duration,
+    duration_choice: DurationChoice,
     menu: bool,
     game_over: bool,
     started: bool,
@@ -109,8 +127,8 @@ struct Game {
 impl Game {
     fn boot() -> Self {
         Self {
-            time: 0,
-            duration: 0,
+            time: DurationChoice::default().as_duration(),
+            duration_choice: DurationChoice::default(),
             game_over: false,
             text: vec![],
             results: vec![],
@@ -121,9 +139,9 @@ impl Game {
 
     fn update(&mut self, message: Message) {
         match message {
-            Message::Tick => {
-                self.time -= 1;
-                if self.time == 0 {
+            Message::Tick(time_elapsed) => {
+                self.time = self.time.saturating_sub(time_elapsed.elapsed());
+                if self.time.is_zero() {
                     self.game_over = true;
                 }
             }
@@ -143,7 +161,7 @@ impl Game {
                 extend_text(&mut self.text, self.results.len() + 200);
             }
             Message::Restart => {
-                self.time = self.duration;
+                self.time = self.duration_choice.as_duration();
                 self.game_over = false;
                 self.started = false;
                 self.results = vec![];
@@ -156,9 +174,9 @@ impl Game {
 
                 extend_text(&mut self.text, 200);
             }
-            Message::UpdateTime(t) => {
-                self.time = t;
-                self.duration = t;
+            Message::UpdateTime(choice) => {
+                self.time = choice.as_duration();
+                self.duration_choice = choice;
             }
             Message::Continue => {
                 self.game_over = false;
@@ -176,7 +194,7 @@ impl Game {
                     .iter()
                     .map(|b| if *b == InputResult::Correct { 1 } else { 0 })
                     .sum(),
-                std::time::Duration::from_secs(self.duration.into()),
+                self.duration_choice.as_duration(),
             );
             let raw: Element<Message> = text(format!("Raw: {:.2} wpm", score.raw_wpm)).into();
             let net: Element<Message> = text(format!("Net: {:.2} wpm", score.net_wpm)).into();
@@ -189,9 +207,9 @@ impl Game {
         }
         if self.menu {
             let time_option: Element<Message> = row![
-                radio("15s", 15, Some(self.time), Message::UpdateTime),
-                radio("30s", 30, Some(self.time), Message::UpdateTime),
-                radio("60s", 60, Some(self.time), Message::UpdateTime),
+                radio("15s", DurationChoice::Secs15, Some(self.duration_choice), Message::UpdateTime),
+                radio("30s", DurationChoice::Secs30, Some(self.duration_choice), Message::UpdateTime),
+                radio("60s", DurationChoice::Secs60, Some(self.duration_choice), Message::UpdateTime),
             ]
             .spacing(10)
             .into();
@@ -229,14 +247,14 @@ impl Game {
             iced::widget::space().into()
         };
 
-        column![info, text(self.time.to_string()), rich_text(spans), button].into()
+        column![info, text(self.time.as_secs_f64().ceil().to_string()), rich_text(spans), button].into()
     }
 
     fn subscription(&self) -> Subscription<Message> {
         let tick = if self.game_over || !self.started {
             Subscription::none()
         } else {
-            iced::time::every(Duration::from_secs(1)).map(|_| Message::Tick)
+            iced::time::every(Duration::from_secs(1)).map(Message::Tick)
         };
 
         let keyboard = if self.game_over {
