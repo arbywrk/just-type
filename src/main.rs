@@ -210,12 +210,15 @@ impl Game {
                 }
             }
             Message::Input(c) => {
-                if self.game_over {
+                if self.game_over || self.menu {
                     return;
                 }
                 if c == 8 as char {
                     // Backspace
                     self.results.pop();
+                    return;
+                }
+                if c.is_control() {
                     return;
                 }
                 self.started = true;
