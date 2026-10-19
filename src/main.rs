@@ -1,10 +1,10 @@
 use iced::{
-    Color, Element, Subscription, keyboard,
-    widget::{column, radio, rich_text, row, span, text},
+    Alignment, Color, Element, Font, Length, Subscription, keyboard,
+    widget::{button, center, column, radio, rich_text, row, space, span, text},
 };
 use rand::seq::IndexedRandom;
 use serde::Deserialize;
-use std::{sync::LazyLock, time::Instant};
+use std::{ops::Range, sync::LazyLock, time::Instant};
 use std::time::Duration;
 
 #[derive(Deserialize)]
@@ -21,6 +21,14 @@ static WORDS: LazyLock<Vec<String>> = LazyLock::new(|| {
 
     lang.words
 });
+
+const FONT_SIZE: f32 = 28.0;
+/// Max chars per line, trailing space included.
+const LINE_CHARS: usize = 48;
+const VISIBLE_LINES: usize = 3;
+/// Monospace glyphs are roughly 0.6em wide; one extra glyph of slack avoids clipping.
+const TEXT_WIDTH: f32 = (LINE_CHARS + 1) as f32 * FONT_SIZE * 0.6;
+const MUTED: Color = Color::from_rgb(0.55, 0.55, 0.55);
 
 #[derive(Eq, PartialEq)]
 enum InputResult {
@@ -49,6 +57,35 @@ fn extend_text(text: &mut Vec<char>, min_len: usize) {
         }
         text.extend(word.chars());
     }
+}
+
+/// Greedily splits `text` into lines of at most `width` chars, breaking after spaces.
+/// Earlier lines never change when words are appended, so lines don't jump while typing.
+fn wrap_lines(text: &[char], width: usize) -> Vec<Range<usize>> {
+    let mut lines = vec![];
+    let mut line_start = 0;
+    let mut word_start = 0;
+
+    for i in 0..=text.len() {
+        let word_end = if i == text.len() {
+            i
+        } else if text[i] == ' ' {
+            i + 1
+        } else {
+            continue;
+        };
+
+        if word_end - line_start > width && word_start > line_start {
+            lines.push(line_start..word_start);
+            line_start = word_start;
+        }
+        word_start = word_end;
+    }
+    if line_start < text.len() {
+        lines.push(line_start..text.len());
+    }
+
+    lines
 }
 
 struct Score {
@@ -215,67 +252,153 @@ impl Game {
 
     fn view(&self) -> Element<'_, Message> {
         if self.game_over && self.started {
-            let score = compute_score(
-                self.keystrokes,
-                self.correct_keystrokes,
-                self.results
-                    .iter()
-                    .map(|b| if *b == InputResult::Correct { 1 } else { 0 })
-                    .sum(),
-                self.duration_choice.as_duration(),
-            );
-            let raw: Element<Message> = text(format!("Raw: {:.2} wpm", score.raw_wpm)).into();
-            let net: Element<Message> = text(format!("Net: {:.2} wpm", score.net_wpm)).into();
-            let accuracy: Element<Message> =
-                text(format!("Accuracy: {:.2} %", score.accuracy)).into();
-
-            let button = iced::widget::button("Continue").on_press(Message::Continue);
-
-            return column![row![raw, net, accuracy].spacing(10), button].into();
+            return self.view_results();
         }
         if self.menu {
-            let time_option: Element<Message> = row![
-                radio("15s", DurationChoice::Secs15, Some(self.duration_choice), Message::UpdateTime),
-                radio("30s", DurationChoice::Secs30, Some(self.duration_choice), Message::UpdateTime),
-                radio("60s", DurationChoice::Secs60, Some(self.duration_choice), Message::UpdateTime),
-            ]
-            .spacing(10)
-            .into();
-
-            let button = iced::widget::button("Start").on_press(Message::Start);
-
-            return column![time_option, button].into();
+            return self.view_menu();
         }
+        self.view_typing()
+    }
 
-        let info: iced::Element<Message> = if !self.started {
-            iced::widget::text("The game will start when you start typing.").into()
-        } else {
-            iced::widget::space().into()
+    fn view_menu(&self) -> Element<'_, Message> {
+        let duration_radio = |label, choice| {
+            radio(label, choice, Some(self.duration_choice), Message::UpdateTime)
+                .size(18)
+                .text_size(18)
         };
+        let time_options = row![
+            duration_radio("15s", DurationChoice::Secs15),
+            duration_radio("30s", DurationChoice::Secs30),
+            duration_radio("60s", DurationChoice::Secs60),
+        ]
+        .spacing(32);
 
-        let spans: Vec<iced::widget::text::Span<'_, ()>> = self
-            .text
+        let start = button(text("Start").size(18))
+            .padding([10, 40])
+            .on_press(Message::Start);
+
+        center(
+            column![
+                column![
+                    text("type-game").size(48).font(Font::MONOSPACE),
+                    text("Pick a duration, then start typing.").size(16).color(MUTED),
+                ]
+                .spacing(8)
+                .align_x(Alignment::Center),
+                time_options,
+                start,
+            ]
+            .spacing(40)
+            .align_x(Alignment::Center),
+        )
+        .padding(40)
+        .into()
+    }
+
+    fn view_results(&self) -> Element<'_, Message> {
+        let score = compute_score(
+            self.keystrokes,
+            self.correct_keystrokes,
+            self.results
+                .iter()
+                .map(|b| if *b == InputResult::Correct { 1 } else { 0 })
+                .sum(),
+            self.duration_choice.as_duration(),
+        );
+
+        let stat = |label, value: String| {
+            column![
+                text(label).size(16).color(MUTED),
+                text(value).size(56).font(Font::MONOSPACE),
+            ]
+            .spacing(4)
+            .align_x(Alignment::Center)
+        };
+        let stats = row![
+            stat("wpm", format!("{:.0}", score.net_wpm)),
+            stat("raw", format!("{:.0}", score.raw_wpm)),
+            stat("acc", format!("{:.0}%", score.accuracy)),
+        ]
+        .spacing(64);
+
+        let test_info = text(format!(
+            "{}s test",
+            self.duration_choice.as_duration().as_secs()
+        ))
+        .size(16)
+        .color(MUTED);
+
+        let buttons = row![
+            button(text("Restart").size(18))
+                .padding([10, 32])
+                .on_press(Message::Restart),
+            button(text("Menu").size(18))
+                .padding([10, 32])
+                .style(button::secondary)
+                .on_press(Message::Continue),
+        ]
+        .spacing(16);
+
+        center(
+            column![column![stats, test_info].spacing(16).align_x(Alignment::Center), buttons]
+                .spacing(48)
+                .align_x(Alignment::Center),
+        )
+        .padding(40)
+        .into()
+    }
+
+    fn view_typing(&self) -> Element<'_, Message> {
+        let lines = wrap_lines(&self.text, LINE_CHARS);
+        let cursor = self.results.len();
+        let current_line = lines
             .iter()
-            .enumerate()
-            .map(|(i, c)| {
-                let color = match self.results.get(i) {
-                    Some(InputResult::Correct) => Color::from_rgb(0.0, 0.8, 0.0),
-                    Some(InputResult::Wrong) => Color::from_rgb(0.9, 0.1, 0.1),
-                    None => Color::from_rgb(0.55, 0.55, 0.55),
-                };
-                span(c.to_string()).color(color)
-            })
-            .collect();
+            .position(|line| line.contains(&cursor))
+            .unwrap_or(lines.len().saturating_sub(1));
+        // Keep the current line in the middle once past the first, so there's always one line ahead.
+        let first_visible = current_line.saturating_sub(1);
 
-        let button: iced::Element<Message> = if self.game_over {
-            iced::widget::button("Restart")
-                .on_press(Message::Restart)
-                .into()
+        let visible_lines = lines
+            .into_iter()
+            .skip(first_visible)
+            .take(VISIBLE_LINES)
+            .map(|line| {
+                let spans: Vec<iced::widget::text::Span<'_, ()>> = line
+                    .map(|i| {
+                        let color = match self.results.get(i) {
+                            Some(InputResult::Correct) => Color::from_rgb(0.0, 0.8, 0.0),
+                            Some(InputResult::Wrong) => Color::from_rgb(0.9, 0.1, 0.1),
+                            None => MUTED,
+                        };
+                        span(self.text[i].to_string()).color(color)
+                    })
+                    .collect();
+
+                rich_text(spans)
+                    .font(Font::MONOSPACE)
+                    .size(FONT_SIZE)
+                    .wrapping(iced::widget::text::Wrapping::None)
+                    .into()
+            });
+
+        let hint: Element<'_, Message> = if self.started {
+            space().into()
         } else {
-            iced::widget::space().into()
+            text("start typing to begin").size(16).color(MUTED).into()
         };
+        let timer = text(self.remaining_time().as_secs_f64().ceil().to_string())
+            .size(FONT_SIZE)
+            .font(Font::MONOSPACE)
+            .style(text::primary);
+        let header = row![hint, space::horizontal(), timer].align_y(Alignment::Center);
 
-        column![info, text(self.remaining_time().as_secs_f64().ceil().to_string()), rich_text(spans), button].into()
+        center(
+            column![header, column(visible_lines).spacing(8)]
+                .spacing(16)
+                .width(Length::Fixed(TEXT_WIDTH)),
+        )
+        .padding(40)
+        .into()
     }
 
     fn subscription(&self) -> Subscription<Message> {
