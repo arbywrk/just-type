@@ -1,3 +1,7 @@
+// TODO: fix default duration properly (It should be correctly set at boot, It should be implemented
+// in such a way that when/if persistance is added it can remember user prefference, it should match
+// the selected radio button).
+// Also one radio button must be required to be set
 use iced::{
     Color, Element, Subscription, keyboard,
     widget::{column, radio, rich_text, row, span, text},
@@ -6,8 +10,6 @@ use rand::seq::IndexedRandom;
 use serde::Deserialize;
 use std::sync::LazyLock;
 use std::time::Duration;
-
-const RAMI_TIME: u8 = 20;
 
 #[derive(Deserialize)]
 struct Language {
@@ -107,8 +109,8 @@ struct Game {
 impl Game {
     fn boot() -> Self {
         Self {
-            time: RAMI_TIME.into(),
-            duration: RAMI_TIME.into(),
+            time: 0,
+            duration: 0,
             game_over: false,
             text: vec![],
             results: vec![],
@@ -141,7 +143,7 @@ impl Game {
                 extend_text(&mut self.text, self.results.len() + 200);
             }
             Message::Restart => {
-                self.time = RAMI_TIME.into();
+                self.time = self.duration;
                 self.game_over = false;
                 self.started = false;
                 self.results = vec![];
