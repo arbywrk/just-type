@@ -1,14 +1,10 @@
-// TODO: fix default duration properly (It should be correctly set at boot, It should be implemented
-// in such a way that when/if persistance is added it can remember user prefference, it should match
-// the selected radio button).
-// Also one radio button must be required to be set
 use iced::{
     Color, Element, Subscription, keyboard,
     widget::{column, radio, rich_text, row, span, text},
 };
 use rand::seq::IndexedRandom;
 use serde::Deserialize;
-use std::sync::LazyLock;
+use std::{sync::LazyLock, time::Instant};
 use std::time::Duration;
 
 #[derive(Deserialize)]
@@ -88,7 +84,7 @@ fn compute_score(total_typed: usize, correct_typed: usize, elapsed: std::time::D
 
 #[derive(Debug, Clone)]
 enum Message {
-    Tick(std::time::Instant),
+    Tick,
     Input(char),
     Restart,
     Start,
@@ -115,7 +111,7 @@ impl DurationChoice {
 }
 
 struct Game {
-    time: Duration,
+    start_time: Option<Instant>,
     duration_choice: DurationChoice,
     menu: bool,
     game_over: bool,
@@ -127,7 +123,7 @@ struct Game {
 impl Game {
     fn boot() -> Self {
         Self {
-            time: DurationChoice::default().as_duration(),
+            start_time: None,
             duration_choice: DurationChoice::default(),
             game_over: false,
             text: vec![],
@@ -137,11 +133,18 @@ impl Game {
         }
     }
 
+    /// The full duration until the first keystroke, then counts down to zero.
+    fn remaining_time(&self) -> Duration {
+        match self.start_time {
+            Some(start_time) => self.duration_choice.as_duration().saturating_sub(start_time.elapsed()),
+            None => self.duration_choice.as_duration(),
+        }
+    }
+
     fn update(&mut self, message: Message) {
         match message {
-            Message::Tick(time_elapsed) => {
-                self.time = self.time.saturating_sub(time_elapsed.elapsed());
-                if self.time.is_zero() {
+            Message::Tick => {
+                if self.remaining_time().is_zero() {
                     self.game_over = true;
                 }
             }
@@ -155,13 +158,16 @@ impl Game {
                     return;
                 }
                 self.started = true;
+                if self.start_time.is_none() {
+                    self.start_time = Some(Instant::now());
+                }
                 if let Some(expected) = self.text.get(self.results.len()) {
                     self.results.push((c == *expected).into());
                 }
                 extend_text(&mut self.text, self.results.len() + 200);
             }
             Message::Restart => {
-                self.time = self.duration_choice.as_duration();
+                self.start_time = None;
                 self.game_over = false;
                 self.started = false;
                 self.results = vec![];
@@ -173,9 +179,10 @@ impl Game {
                 self.results = vec![];
 
                 extend_text(&mut self.text, 200);
+
+                self.start_time = None;
             }
             Message::UpdateTime(choice) => {
-                self.time = choice.as_duration();
                 self.duration_choice = choice;
             }
             Message::Continue => {
@@ -247,14 +254,14 @@ impl Game {
             iced::widget::space().into()
         };
 
-        column![info, text(self.time.as_secs_f64().ceil().to_string()), rich_text(spans), button].into()
+        column![info, text(self.remaining_time().as_secs_f64().ceil().to_string()), rich_text(spans), button].into()
     }
 
     fn subscription(&self) -> Subscription<Message> {
         let tick = if self.game_over || !self.started {
             Subscription::none()
         } else {
-            iced::time::every(Duration::from_secs(1)).map(Message::Tick)
+            iced::time::every(Duration::from_millis(100)).map(|_| Message::Tick)
         };
 
         let keyboard = if self.game_over {
