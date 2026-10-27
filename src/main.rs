@@ -1,5 +1,6 @@
 mod game;
 mod score;
+mod typing_text;
 mod view;
 mod words;
 

@@ -211,9 +211,9 @@ impl Game {
         let keyboard = keyboard::listen().filter_map(|event| match event {
             keyboard::Event::ModifiersChanged(modifiers) => {
                 Some(Message::KeyboardModifiersChanged {
-                    ctrl: modifiers.control()
+                    ctrl: modifiers.control(),
                 })
-            },
+            }
             keyboard::Event::KeyPressed {
                 key: Key::Named(Named::Backspace),
                 ..

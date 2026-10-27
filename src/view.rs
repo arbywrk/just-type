@@ -1,25 +1,24 @@
 use std::time::Duration;
 
 use iced::{
-    Alignment, Color, Element, Font, Length,
-    widget::{button, center, column, radio, rich_text, row, space, span, text},
+    Alignment, Color, Element, Font,
+    widget::{button, center, column, radio, row, space, text},
 };
 
 use crate::{
-    game::{DurationChoice, InputResult, Message, Round},
+    game::{DurationChoice, Message, Round},
     score::Score,
-    words,
+    typing_text::{self, TypingText},
 };
 
 const FONT_SIZE: f32 = 28.0;
-/// Max chars per line, trailing space included.
-const LINE_CHARS: usize = 48;
+/// Max width of the typing area. Lines wrap to fit it.
+const TEXT_WIDTH: f32 = 820.0;
 const VISIBLE_LINES: usize = 3;
-/// Monospace glyphs are roughly 0.6em wide; one extra glyph of slack avoids clipping.
-const TEXT_WIDTH: f32 = (LINE_CHARS + 1) as f32 * FONT_SIZE * 0.6;
 const MUTED: Color = Color::from_rgb(0.55, 0.55, 0.55);
 const CORRECT: Color = Color::from_rgb(0.0, 0.8, 0.0);
 const WRONG: Color = Color::from_rgb(0.9, 0.1, 0.1);
+const CARET: Color = Color::from_rgb(0.95, 0.75, 0.2);
 
 pub fn menu(duration: DurationChoice) -> Element<'static, Message> {
     let duration_radio = |label, choice| {
@@ -104,29 +103,20 @@ pub fn results(score: Score, duration: DurationChoice) -> Element<'static, Messa
 }
 
 pub fn typing(round: &Round, remaining: Duration) -> Element<'_, Message> {
-    let chars = round.text();
-    let results = round.results();
-
-    let visible_lines =
-        words::visible_lines(chars, results.len(), LINE_CHARS, VISIBLE_LINES).map(|line| {
-            let spans: Vec<text::Span<'_, ()>> = line
-                .map(|i| {
-                    let (color, ch) = match (results.get(i), chars[i]) {
-                        (Some(InputResult::Correct), ch) => (CORRECT, ch),
-                        (Some(InputResult::Wrong), ' ') => (WRONG, '_'),
-                        (Some(InputResult::Wrong), ch) => (WRONG, ch),
-                        (None, ch) => (MUTED, ch),
-                    };
-                    span(ch.to_owned()).color(color)
-                })
-                .collect();
-
-            rich_text(spans)
-                .font(Font::MONOSPACE)
-                .size(FONT_SIZE)
-                .wrapping(text::Wrapping::None)
-                .into()
-        });
+    let typing_text = TypingText::new(
+        round.text(),
+        round.results(),
+        typing_text::Style {
+            pending: MUTED,
+            correct: CORRECT,
+            wrong: WRONG,
+            caret: CARET,
+        },
+    )
+    .font(Font::MONOSPACE)
+    .size(FONT_SIZE)
+    .line_spacing(8.0)
+    .visible_lines(VISIBLE_LINES);
 
     let hint: Element<'_, Message> = if round.started() {
         space().into()
@@ -140,9 +130,9 @@ pub fn typing(round: &Round, remaining: Duration) -> Element<'_, Message> {
     let header = row![hint, space::horizontal(), timer].align_y(Alignment::Center);
 
     center(
-        column![header, column(visible_lines).spacing(8)]
+        column![header, typing_text]
             .spacing(16)
-            .width(Length::Fixed(TEXT_WIDTH)),
+            .max_width(TEXT_WIDTH),
     )
     .padding(40)
     .into()
