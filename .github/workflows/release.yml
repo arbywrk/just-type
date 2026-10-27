@@ -28,17 +28,13 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-22.04
-          - target: aarch64-unknown-linux-gnu
-            os: ubuntu-22.04-arm
           - target: x86_64-pc-windows-msvc
             os: windows-latest
           - target: aarch64-apple-darwin
             os: macos-latest
-          - target: x86_64-apple-darwin
-            os: macos-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ env.TAG }}
 
@@ -56,16 +52,16 @@ jobs:
       - name: Package
         shell: bash
         run: |
-          name="type-game-$TAG-${{ matrix.target }}"
+          name="just-type-$TAG-${{ matrix.target }}"
           mkdir "$name"
           cp README.md CHANGELOG.md "$name/"
 
           if [[ "${{ matrix.target }}" == *windows* ]]; then
-            cp "target/${{ matrix.target }}/release/type-game.exe" "$name/"
+            cp "target/${{ matrix.target }}/release/just-type.exe" "$name/"
             7z a "$name.zip" "$name" > /dev/null
             archive="$name.zip"
           else
-            cp "target/${{ matrix.target }}/release/type-game" "$name/"
+            cp "target/${{ matrix.target }}/release/just-type" "$name/"
             tar -czf "$name.tar.gz" "$name"
             archive="$name.tar.gz"
           fi
