@@ -21,6 +21,7 @@ pub enum Message {
     Restart,
     SelectDuration(DurationChoice),
     BackToMenu,
+    KeyboardModifiersChanged { ctrl: bool },
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -104,8 +105,13 @@ impl Round {
         words::extend_text(&mut self.text, self.results.len() + TEXT_BUFFER);
     }
 
-    fn backspace(&mut self) {
+    fn backspace(&mut self, ctrl: bool) {
         self.results.pop();
+        if ctrl {
+            while !self.results.is_empty() && self.text[self.results.len() - 1] != ' ' {
+                self.results.pop();
+            }
+        }
     }
 
     /// The full duration until the first keystroke, then counts down to zero.
@@ -134,6 +140,7 @@ pub struct Game {
     screen: Screen,
     duration_choice: DurationChoice,
     round: Round,
+    ctrl_pressed: bool,
 }
 
 impl Game {
@@ -142,6 +149,7 @@ impl Game {
             screen: Screen::Menu,
             duration_choice: DurationChoice::default(),
             round: Round::new(),
+            ctrl_pressed: false,
         }
     }
 
@@ -159,8 +167,11 @@ impl Game {
             }
             Message::Backspace => {
                 if let Screen::Typing = self.screen {
-                    self.round.backspace();
+                    self.round.backspace(self.ctrl_pressed);
                 }
+            }
+            Message::KeyboardModifiersChanged { ctrl } => {
+                self.ctrl_pressed = ctrl;
             }
             Message::Start | Message::Restart => {
                 self.round = Round::new();
@@ -198,6 +209,11 @@ impl Game {
         };
 
         let keyboard = keyboard::listen().filter_map(|event| match event {
+            keyboard::Event::ModifiersChanged(modifiers) => {
+                Some(Message::KeyboardModifiersChanged {
+                    ctrl: modifiers.control(),
+                })
+            }
             keyboard::Event::KeyPressed {
                 key: Key::Named(Named::Backspace),
                 ..
