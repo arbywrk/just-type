@@ -1,17 +1,28 @@
 use std::time::Duration;
 
 use iced::{
-    Alignment, Color, Element, Font,
-    widget::{button, center, column, radio, row, space, text},
+    Alignment, Border, Color, Element, Font, Theme,
+    widget::{button, center, center_x, column, mouse_area, radio, row, space, svg, text},
 };
 
 use crate::{
-    game::{DurationChoice, Message, Round},
+    game::{DurationChoice, Message, RestartButton, Round},
     score::Score,
     typing_text::{self, TypingText},
 };
 
+/// Hints and labels.
+const SMALL_SIZE: f32 = 16.0;
+/// Buttons and options.
+const BODY_SIZE: f32 = 18.0;
+/// The typing text and timer.
 const FONT_SIZE: f32 = 28.0;
+const TITLE_SIZE: f32 = 48.0;
+const STAT_SIZE: f32 = 56.0;
+const ICON_SIZE: f32 = FONT_SIZE;
+/// Space between an icon and its button border, which also enlarges the hitbox.
+const ICON_PADDING: f32 = 8.0;
+const CORNER_RADIUS: f32 = 8.0;
 /// Max width of the typing area. Lines wrap to fit it.
 const TEXT_WIDTH: f32 = 820.0;
 const VISIBLE_LINES: usize = 3;
@@ -23,8 +34,8 @@ const CARET: Color = Color::from_rgb(0.95, 0.75, 0.2);
 pub fn menu(duration: DurationChoice) -> Element<'static, Message> {
     let duration_radio = |label, choice| {
         radio(label, choice, Some(duration), Message::SelectDuration)
-            .size(18)
-            .text_size(18)
+            .size(BODY_SIZE)
+            .text_size(BODY_SIZE)
     };
     let time_options = row![
         duration_radio("15s", DurationChoice::Secs15),
@@ -33,16 +44,16 @@ pub fn menu(duration: DurationChoice) -> Element<'static, Message> {
     ]
     .spacing(32);
 
-    let start = button(text("Start").size(18))
+    let start = button(text("Start").size(BODY_SIZE))
         .padding([10, 40])
         .on_press(Message::Start);
 
     center(
         column![
             column![
-                text("just-type").size(48).font(Font::MONOSPACE),
+                text("just-type").size(TITLE_SIZE).font(Font::MONOSPACE),
                 text("Pick a duration, then start typing.")
-                    .size(16)
+                    .size(SMALL_SIZE)
                     .color(MUTED),
             ]
             .spacing(8)
@@ -60,8 +71,8 @@ pub fn menu(duration: DurationChoice) -> Element<'static, Message> {
 pub fn results(score: Score, duration: DurationChoice) -> Element<'static, Message> {
     let stat = |label, value: String| {
         column![
-            text(label).size(16).color(MUTED),
-            text(value).size(56).font(Font::MONOSPACE),
+            text(label).size(SMALL_SIZE).color(MUTED),
+            text(value).size(STAT_SIZE).font(Font::MONOSPACE),
         ]
         .spacing(4)
         .align_x(Alignment::Center)
@@ -74,14 +85,14 @@ pub fn results(score: Score, duration: DurationChoice) -> Element<'static, Messa
     .spacing(64);
 
     let test_info = text(format!("{}s test", duration.as_duration().as_secs()))
-        .size(16)
+        .size(SMALL_SIZE)
         .color(MUTED);
 
     let buttons = row![
-        button(text("Restart").size(18))
+        button(text("Restart").size(BODY_SIZE))
             .padding([10, 32])
             .on_press(Message::Restart),
-        button(text("Menu").size(18))
+        button(text("Menu").size(BODY_SIZE))
             .padding([10, 32])
             .style(button::secondary)
             .on_press(Message::BackToMenu),
@@ -102,7 +113,7 @@ pub fn results(score: Score, duration: DurationChoice) -> Element<'static, Messa
     .into()
 }
 
-pub fn typing(round: &Round, remaining: Duration) -> Element<'_, Message> {
+pub fn typing(round: &Round, remaining: Duration, restart: RestartButton) -> Element<'_, Message> {
     let typing_text = TypingText::new(
         round.text(),
         round.results(),
@@ -121,7 +132,10 @@ pub fn typing(round: &Round, remaining: Duration) -> Element<'_, Message> {
     let hint: Element<'_, Message> = if round.started() {
         space().into()
     } else {
-        text("start typing to begin").size(16).color(MUTED).into()
+        text("start typing to begin")
+            .size(SMALL_SIZE)
+            .color(MUTED)
+            .into()
     };
     let timer = text(remaining.as_secs_f64().ceil().to_string())
         .size(FONT_SIZE)
@@ -129,10 +143,54 @@ pub fn typing(round: &Round, remaining: Duration) -> Element<'_, Message> {
         .style(text::primary);
     let header = row![hint, space::horizontal(), timer].align_y(Alignment::Center);
 
-    // TODO: add restart/exit buttons in the typing view
+    // Hidden mid-round so it doesn't distract, full contrast when hovered or selected.
+    let highlighted = restart.hovered || restart.selected;
+    let opacity = if round.started() && !highlighted {
+        0.0
+    } else {
+        1.0
+    };
+    let restart_color = move |theme: &Theme| {
+        if highlighted {
+            theme.palette().text
+        } else {
+            MUTED
+        }
+    };
+
+    let restart_icon = svg(svg::Handle::from_memory(include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/resources/icons/restart.svg"
+    ))))
+    .width(ICON_SIZE)
+    .height(ICON_SIZE)
+    .opacity(opacity)
+    .style(move |theme: &Theme, _| svg::Style {
+        color: Some(restart_color(theme)),
+    });
+    let restart_button = mouse_area(
+        button(restart_icon)
+            .padding(ICON_PADDING)
+            .style(move |theme: &Theme, _| {
+                let color = restart_color(theme).scale_alpha(opacity);
+                button::Style {
+                    background: None,
+                    text_color: color,
+                    border: Border {
+                        color,
+                        width: 1.0,
+                        radius: CORNER_RADIUS.into(),
+                    },
+                    ..button::Style::default()
+                }
+            })
+            .on_press(Message::Restart),
+    )
+    .on_enter(Message::RestartHovered(true))
+    .on_exit(Message::RestartHovered(false));
 
     center(
-        column![header, typing_text]
+        column![header, typing_text, center_x(restart_button)]
             .spacing(16)
             .max_width(TEXT_WIDTH),
     )

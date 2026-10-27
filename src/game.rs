@@ -11,6 +11,9 @@ use crate::{
 };
 
 const TEXT_BUFFER: usize = 200;
+const ZOOM_STEP: f32 = 0.1;
+const MIN_ZOOM: f32 = 0.5;
+const MAX_ZOOM: f32 = 2.0;
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -22,6 +25,12 @@ pub enum Message {
     SelectDuration(DurationChoice),
     BackToMenu,
     KeyboardModifiersChanged { ctrl: bool },
+    ZoomIn,
+    ZoomOut,
+    ZoomReset,
+    RestartHovered(bool),
+    ToggleRestartSelected,
+    Confirm,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -136,11 +145,21 @@ impl Round {
     }
 }
 
+/// Hover and keyboard selection of the restart button in the typing view.
+#[derive(Default, Clone, Copy)]
+pub struct RestartButton {
+    pub hovered: bool,
+    pub selected: bool,
+}
+
 pub struct Game {
     screen: Screen,
     duration_choice: DurationChoice,
     round: Round,
     ctrl_pressed: bool,
+    /// Scale factor applied to the whole UI, on top of the OS one.
+    zoom: f32,
+    restart_button: RestartButton,
 }
 
 impl Game {
@@ -150,6 +169,8 @@ impl Game {
             duration_choice: DurationChoice::default(),
             round: Round::new(),
             ctrl_pressed: false,
+            zoom: 1.0,
+            restart_button: RestartButton::default(),
         }
     }
 
@@ -163,6 +184,7 @@ impl Game {
             Message::Input(c) => {
                 if let Screen::Typing = self.screen {
                     self.round.type_char(c);
+                    self.restart_button.selected = false;
                 }
             }
             Message::Backspace => {
@@ -173,15 +195,36 @@ impl Game {
             Message::KeyboardModifiersChanged { ctrl } => {
                 self.ctrl_pressed = ctrl;
             }
-            Message::Start | Message::Restart => {
-                self.round = Round::new();
-                self.screen = Screen::Typing;
-            }
+            Message::Start | Message::Restart => self.start_round(),
             Message::SelectDuration(choice) => {
                 self.duration_choice = choice;
             }
             Message::BackToMenu => {
                 self.screen = Screen::Menu;
+            }
+            Message::ZoomIn => {
+                self.zoom = (self.zoom + ZOOM_STEP).min(MAX_ZOOM);
+            }
+            Message::ZoomOut => {
+                self.zoom = (self.zoom - ZOOM_STEP).max(MIN_ZOOM);
+            }
+            Message::ZoomReset => {
+                self.zoom = 1.0;
+            }
+            Message::RestartHovered(hovered) => {
+                self.restart_button.hovered = hovered;
+            }
+            Message::ToggleRestartSelected => {
+                if let Screen::Typing = self.screen {
+                    self.restart_button.selected = !self.restart_button.selected;
+                }
+            }
+            Message::Confirm => {
+                if let Screen::Typing = self.screen
+                    && self.restart_button.selected
+                {
+                    self.start_round();
+                }
             }
         }
     }
@@ -189,7 +232,7 @@ impl Game {
     pub fn view(&self) -> Element<'_, Message> {
         match self.screen {
             Screen::Menu => view::menu(self.duration_choice),
-            Screen::Typing => view::typing(&self.round, self.remaining_time()),
+            Screen::Typing => view::typing(&self.round, self.remaining_time(), self.restart_button),
             Screen::Results => view::results(
                 self.round.score(self.duration_choice.as_duration()),
                 self.duration_choice,
@@ -197,12 +240,13 @@ impl Game {
         }
     }
 
-    pub fn subscription(&self) -> Subscription<Message> {
-        let Screen::Typing = self.screen else {
-            return Subscription::none();
-        };
+    pub fn scale_factor(&self) -> f32 {
+        self.zoom
+    }
 
-        let tick = if self.round.started() {
+    pub fn subscription(&self) -> Subscription<Message> {
+        // Zoom works on every screen. Typing input is ignored by `update` outside a round.
+        let tick = if matches!(self.screen, Screen::Typing) && self.round.started() {
             iced::time::every(Duration::from_millis(100)).map(|_| Message::Tick)
         } else {
             Subscription::none()
@@ -218,6 +262,24 @@ impl Game {
                 key: Key::Named(Named::Backspace),
                 ..
             } => Some(Message::Backspace),
+            keyboard::Event::KeyPressed {
+                key: Key::Named(Named::Tab),
+                ..
+            } => Some(Message::ToggleRestartSelected),
+            keyboard::Event::KeyPressed {
+                key: Key::Named(Named::Enter),
+                ..
+            } => Some(Message::Confirm),
+            keyboard::Event::KeyPressed {
+                modified_key,
+                modifiers,
+                ..
+            } if modifiers.command() => match modified_key.as_ref() {
+                Key::Character("+" | "=") => Some(Message::ZoomIn),
+                Key::Character("-") => Some(Message::ZoomOut),
+                Key::Character("0") => Some(Message::ZoomReset),
+                _ => None,
+            },
             keyboard::Event::KeyPressed { text: Some(t), .. } => t
                 .chars()
                 .next()
@@ -227,6 +289,16 @@ impl Game {
         });
 
         Subscription::batch([tick, keyboard])
+    }
+
+    fn start_round(&mut self) {
+        self.round = Round::new();
+        self.restart_button.selected = false;
+        // Coming from another screen the cursor can't be over the button yet.
+        if !matches!(self.screen, Screen::Typing) {
+            self.restart_button.hovered = false;
+        }
+        self.screen = Screen::Typing;
     }
 
     fn remaining_time(&self) -> Duration {
