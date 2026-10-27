@@ -111,12 +111,13 @@ pub fn typing(round: &Round, remaining: Duration) -> Element<'_, Message> {
         words::visible_lines(chars, results.len(), LINE_CHARS, VISIBLE_LINES).map(|line| {
             let spans: Vec<text::Span<'_, ()>> = line
                 .map(|i| {
-                    let color = match results.get(i) {
-                        Some(InputResult::Correct) => CORRECT,
-                        Some(InputResult::Wrong) => WRONG,
-                        None => MUTED,
+                    let (color, ch) = match (results.get(i), chars[i]) {
+                        (Some(InputResult::Correct), ch) => (CORRECT, ch),
+                        (Some(InputResult::Wrong), ' ') => (WRONG, '_'),
+                        (Some(InputResult::Wrong), ch) => (WRONG, ch),
+                        (None, ch) => (MUTED, ch),
                     };
-                    span(chars[i].to_string()).color(color)
+                    span(ch.to_owned()).color(color)
                 })
                 .collect();
 
