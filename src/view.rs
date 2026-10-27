@@ -40,7 +40,7 @@ pub fn menu(duration: DurationChoice) -> Element<'static, Message> {
     center(
         column![
             column![
-                text("type-game").size(48).font(Font::MONOSPACE),
+                text("just-type").size(48).font(Font::MONOSPACE),
                 text("Pick a duration, then start typing.")
                     .size(16)
                     .color(MUTED),
@@ -128,6 +128,8 @@ pub fn typing(round: &Round, remaining: Duration) -> Element<'_, Message> {
         .font(Font::MONOSPACE)
         .style(text::primary);
     let header = row![hint, space::horizontal(), timer].align_y(Alignment::Center);
+
+    // TODO: add restart/exit buttons in the typing view
 
     center(
         column![header, typing_text]

@@ -1,4 +1,4 @@
-# Type Game
+# Just Type
 
 This is a little typing game for practicing touch typeing. I made it for fun and it is a bit rough around the
 edges, but if you like it feel free too play and contribute.
