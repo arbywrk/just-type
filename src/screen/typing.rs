@@ -57,6 +57,8 @@ pub enum Message {
     Restart,
     ExitHovered(bool),
     Exit,
+    /// Clears the restart button's selection, or exits when nothing is selected.
+    Cancel,
 }
 
 pub enum Event {
@@ -210,6 +212,14 @@ impl State {
                 None
             }
             Message::Exit => Some(Event::Exit),
+            Message::Cancel => {
+                if self.restart_button.selected {
+                    self.restart_button.selected = false;
+                    None
+                } else {
+                    Some(Event::Exit)
+                }
+            }
         }
     }
 
@@ -308,6 +318,10 @@ fn key_to_message(event: keyboard::Event) -> Option<Message> {
             key: Key::Named(Named::Enter),
             ..
         } => Some(Message::ActivateSelected),
+        keyboard::Event::KeyPressed {
+            key: Key::Named(Named::Escape),
+            ..
+        } => Some(Message::Cancel),
         // Shortcuts like zoom are handled by the app, not typed.
         keyboard::Event::KeyPressed { modifiers, .. } if modifiers.command() => None,
         keyboard::Event::KeyPressed { text: Some(t), .. } => {
@@ -319,33 +333,11 @@ fn key_to_message(event: keyboard::Event) -> Option<Message> {
 
 #[cfg(test)]
 mod tests {
-    use iced::keyboard::{
-        Location, Modifiers,
-        key::{NativeCode, Physical},
-    };
+    use iced::keyboard::Modifiers;
     use rstest::rstest;
 
     use super::*;
-
-    mod helpers {
-        use super::*;
-
-        pub fn press(key: Key, modifiers: Modifiers, text: Option<&str>) -> keyboard::Event {
-            keyboard::Event::KeyPressed {
-                key: key.clone(),
-                modified_key: key,
-                physical_key: Physical::Unidentified(NativeCode::Unidentified),
-                location: Location::Standard,
-                modifiers,
-                text: text.map(Into::into),
-                repeat: false,
-            }
-        }
-
-        pub fn character(c: &str, modifiers: Modifiers) -> keyboard::Event {
-            press(Key::Character(c.into()), modifiers, Some(c))
-        }
-    }
+    use crate::screen::test_helpers as helpers;
 
     mod key_to_message {
         use super::*;
@@ -368,15 +360,33 @@ mod tests {
             helpers::press(Key::Named(Named::Enter), Modifiers::empty(), Some("\r")),
             Message::ActivateSelected
         )]
+        #[case::escape(
+            helpers::press(Key::Named(Named::Escape), Modifiers::empty(), Some("\u{1b}")),
+            Message::Cancel
+        )]
         fn maps_key_to_its_message(#[case] event: keyboard::Event, #[case] expected: Message) {
             assert_eq!(key_to_message(event), Some(expected));
         }
 
         #[rstest]
         #[case::shortcut(helpers::character("=", Modifiers::COMMAND))]
-        #[case::control_character(helpers::press(Key::Named(Named::Escape), Modifiers::empty(), Some("\u{1b}")))]
+        #[case::control_character(helpers::press(Key::Named(Named::Delete), Modifiers::empty(), Some("\u{7f}")))]
         fn ignores_key(#[case] event: keyboard::Event) {
             assert_eq!(key_to_message(event), None);
+        }
+    }
+
+    mod update {
+        use super::*;
+
+        #[rstest]
+        fn escape_clears_the_selection_before_exiting() {
+            let mut state = State::new(Duration::from_secs(15));
+            state.update(Message::ToggleRestartSelected);
+
+            assert!(state.update(Message::Cancel).is_none());
+            assert!(!state.restart_button.selected);
+            assert!(matches!(state.update(Message::Cancel), Some(Event::Exit)));
         }
     }
 }

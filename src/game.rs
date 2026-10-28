@@ -37,6 +37,24 @@ impl DurationChoice {
             DurationChoice::Secs60 => Duration::from_secs(60),
         }
     }
+
+    /// The next longer choice, wrapping around to the shortest.
+    pub fn next(self) -> Self {
+        match self {
+            DurationChoice::Secs15 => DurationChoice::Secs30,
+            DurationChoice::Secs30 => DurationChoice::Secs60,
+            DurationChoice::Secs60 => DurationChoice::Secs15,
+        }
+    }
+
+    /// The next shorter choice, wrapping around to the longest.
+    pub fn previous(self) -> Self {
+        match self {
+            DurationChoice::Secs15 => DurationChoice::Secs60,
+            DurationChoice::Secs30 => DurationChoice::Secs15,
+            DurationChoice::Secs60 => DurationChoice::Secs30,
+        }
+    }
 }
 
 struct Settings {
@@ -88,7 +106,7 @@ impl Game {
                 {
                     match event {
                         typing::Event::Finished(score) => self.screen = Screen::Results(results::State::new(score)),
-                        typing::Event::Exit => self.screen = Screen::Menu(menu::State),
+                        typing::Event::Exit => self.show_menu(),
                     }
                 }
             }
@@ -98,7 +116,7 @@ impl Game {
                 {
                     match event {
                         results::Event::Restart => self.start_round(),
-                        results::Event::BackToMenu => self.screen = Screen::Menu(menu::State),
+                        results::Event::BackToMenu => self.show_menu(),
                     }
                 }
             }
@@ -107,7 +125,7 @@ impl Game {
 
     pub fn view(&self) -> Element<'_, Message> {
         match &self.screen {
-            Screen::Menu(state) => state.view(self.settings.duration).map(Message::Menu),
+            Screen::Menu(state) => state.view().map(Message::Menu),
             Screen::Typing(state) => state.view().map(Message::Typing),
             Screen::Results(state) => state.view().map(Message::Results),
         }
@@ -134,11 +152,16 @@ impl Game {
         });
 
         let screen = match &self.screen {
+            Screen::Menu(state) => state.subscription().map(Message::Menu),
             Screen::Typing(state) => state.subscription().map(Message::Typing),
-            Screen::Menu(_) | Screen::Results(_) => Subscription::none(),
+            Screen::Results(state) => state.subscription().map(Message::Results),
         };
 
         Subscription::batch([zoom, screen])
+    }
+
+    fn show_menu(&mut self) {
+        self.screen = Screen::Menu(menu::State::new(self.settings.duration));
     }
 
     fn start_round(&mut self) {

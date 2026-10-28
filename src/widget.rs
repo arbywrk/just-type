@@ -1,8 +1,8 @@
 //! Widgets shared between screens.
 
 use iced::{
-    Border, Element, Theme,
-    widget::{button, mouse_area, svg},
+    Border, Color, Element, Theme,
+    widget::{button, container, mouse_area, svg},
 };
 
 use crate::style::MUTED;
@@ -10,6 +10,11 @@ use crate::style::MUTED;
 /// Space between the icon and the button's border, which also enlarges the hitbox.
 const ICON_PADDING: f32 = 8.0;
 const CORNER_RADIUS: f32 = 8.0;
+const FOCUS_RING_WIDTH: f32 = 2.0;
+/// Space between a control and its focus ring.
+const FOCUS_RING_GAP: f32 = 2.0;
+/// iced's buttons have 2px rounded corners, so the ring follows that curve around the gap.
+const FOCUS_RING_RADIUS: f32 = 2.0 + FOCUS_RING_GAP + FOCUS_RING_WIDTH;
 
 /// A square icon button with a rounded border, muted unless `highlighted`.
 ///
@@ -58,5 +63,25 @@ pub fn icon_button<'a, Message: Clone + 'a>(
     mouse_area(button)
         .on_enter(on_hover(true))
         .on_exit(on_hover(false))
+        .into()
+}
+
+/// Draws a ring around `content` while `focused`, like a browser's focus outline. The space
+/// for it is always reserved, so focusing doesn't move anything.
+pub fn focus_ring<'a, Message: 'a>(content: impl Into<Element<'a, Message>>, focused: bool) -> Element<'a, Message> {
+    container(content)
+        .padding(FOCUS_RING_GAP + FOCUS_RING_WIDTH)
+        .style(move |theme: &Theme| container::Style {
+            border: Border {
+                color: if focused {
+                    theme.palette().text
+                } else {
+                    Color::TRANSPARENT
+                },
+                width: FOCUS_RING_WIDTH,
+                radius: FOCUS_RING_RADIUS.into(),
+            },
+            ..container::Style::default()
+        })
         .into()
 }
