@@ -260,12 +260,7 @@ where
         Size::new(Length::Fill, Length::Shrink)
     }
 
-    fn layout(
-        &mut self,
-        tree: &mut Tree,
-        _renderer: &Renderer,
-        limits: &layout::Limits,
-    ) -> layout::Node {
+    fn layout(&mut self, tree: &mut Tree, _renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
         let width = limits.width(Length::Fill).max().width;
         let state = tree.state.downcast_mut::<State<Renderer::Paragraph>>();
 

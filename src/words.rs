@@ -37,11 +37,7 @@ pub fn extend_text(text: &mut Vec<char>, min_len: usize) {
 /// `word_width` measures a word together with its trailing space, if any.
 /// A word wider than `max_width` gets a line of its own.
 /// Earlier lines never change when words are appended.
-pub fn wrap_lines(
-    text: &[char],
-    max_width: f32,
-    mut word_width: impl FnMut(&[char]) -> f32,
-) -> Vec<Range<usize>> {
+pub fn wrap_lines(text: &[char], max_width: f32, mut word_width: impl FnMut(&[char]) -> f32) -> Vec<Range<usize>> {
     let mut lines = vec![];
     let mut line_start = 0;
     let mut line_width = 0.0;
@@ -117,10 +113,7 @@ mod tests {
         fn overlong_word_gets_its_own_line() {
             let text = helpers::chars("a bbbbbbbb c");
 
-            assert_eq!(
-                wrap_lines(&text, 4.0, helpers::unit_width),
-                [0..2, 2..11, 11..12]
-            );
+            assert_eq!(wrap_lines(&text, 4.0, helpers::unit_width), [0..2, 2..11, 11..12]);
         }
 
         #[test]

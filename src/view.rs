@@ -68,7 +68,7 @@ pub fn menu(duration: DurationChoice) -> Element<'static, Message> {
     .into()
 }
 
-pub fn results(score: Score, duration: DurationChoice) -> Element<'static, Message> {
+pub fn results(score: Score) -> Element<'static, Message> {
     let stat = |label, value: String| {
         column![
             text(label).size(SMALL_SIZE).color(MUTED),
@@ -84,7 +84,7 @@ pub fn results(score: Score, duration: DurationChoice) -> Element<'static, Messa
     ]
     .spacing(64);
 
-    let test_info = text(format!("{}s test", duration.as_duration().as_secs()))
+    let test_info = text(format!("{}s test", score.duration.as_secs()))
         .size(SMALL_SIZE)
         .color(MUTED);
 
@@ -101,9 +101,7 @@ pub fn results(score: Score, duration: DurationChoice) -> Element<'static, Messa
 
     center(
         column![
-            column![stats, test_info]
-                .spacing(16)
-                .align_x(Alignment::Center),
+            column![stats, test_info].spacing(16).align_x(Alignment::Center),
             buttons,
         ]
         .spacing(48)
@@ -132,10 +130,7 @@ pub fn typing(round: &Round, remaining: Duration, restart: RestartButton) -> Ele
     let hint: Element<'_, Message> = if round.started() {
         space().into()
     } else {
-        text("start typing to begin")
-            .size(SMALL_SIZE)
-            .color(MUTED)
-            .into()
+        text("start typing to begin").size(SMALL_SIZE).color(MUTED).into()
     };
     let timer = text(remaining.as_secs_f64().ceil().to_string())
         .size(FONT_SIZE)
@@ -145,17 +140,9 @@ pub fn typing(round: &Round, remaining: Duration, restart: RestartButton) -> Ele
 
     // Hidden mid-round so it doesn't distract, full contrast when hovered or selected.
     let highlighted = restart.hovered || restart.selected;
-    let opacity = if round.started() && !highlighted {
-        0.0
-    } else {
-        1.0
-    };
+    let opacity = if round.started() && !highlighted { 0.0 } else { 1.0 };
     let restart_color = move |theme: &Theme| {
-        if highlighted {
-            theme.palette().text
-        } else {
-            MUTED
-        }
+        if highlighted { theme.palette().text } else { MUTED }
     };
 
     let restart_icon = svg(svg::Handle::from_memory(include_bytes!(concat!(

@@ -19,12 +19,11 @@ const MAX_ZOOM: f32 = 2.0;
 pub enum Message {
     Tick,
     Input(char),
-    Backspace,
+    Backspace { word: bool },
     Start,
     Restart,
     SelectDuration(DurationChoice),
     BackToMenu,
-    KeyboardModifiersChanged { ctrl: bool },
     ZoomIn,
     ZoomOut,
     ZoomReset,
@@ -63,22 +62,31 @@ impl DurationChoice {
     }
 }
 
+#[derive(Default)]
 enum Screen {
+    #[default]
     Menu,
-    Typing,
-    Results,
+    Typing {
+        round: Round,
+        restart_button: RestartButton,
+    },
+    Results {
+        score: Score,
+    },
 }
 
 pub struct Round {
     text: Vec<char>,
     results: Vec<InputResult>,
     start_time: Option<Instant>,
+    /// Copied from the settings when the round starts, so changing them can't affect it.
+    duration: Duration,
     keystrokes: usize,
     correct_keystrokes: usize,
 }
 
 impl Round {
-    fn new() -> Self {
+    fn new(duration: Duration) -> Self {
         let mut text = vec![];
         words::extend_text(&mut text, TEXT_BUFFER);
 
@@ -86,6 +94,7 @@ impl Round {
             text,
             results: vec![],
             start_time: None,
+            duration,
             keystrokes: 0,
             correct_keystrokes: 0,
         }
@@ -114,9 +123,11 @@ impl Round {
         words::extend_text(&mut self.text, self.results.len() + TEXT_BUFFER);
     }
 
-    fn backspace(&mut self, ctrl: bool) {
+    /// Deletes the last typed character.
+    /// If `word` is true, it deletes everything back to the previous space.
+    fn backspace(&mut self, word: bool) {
         self.results.pop();
-        if ctrl {
+        if word {
             while !self.results.is_empty() && self.text[self.results.len() - 1] != ' ' {
                 self.results.pop();
             }
@@ -124,24 +135,15 @@ impl Round {
     }
 
     /// The full duration until the first keystroke, then counts down to zero.
-    fn remaining(&self, total: Duration) -> Duration {
+    fn remaining(&self) -> Duration {
         self.start_time
-            .map_or(total, |start| total.saturating_sub(start.elapsed()))
+            .map_or(self.duration, |start| self.duration.saturating_sub(start.elapsed()))
     }
 
-    fn score(&self, elapsed: Duration) -> Score {
-        let correct_chars = self
-            .results
-            .iter()
-            .filter(|&&r| r == InputResult::Correct)
-            .count();
+    fn score(&self) -> Score {
+        let correct_chars = self.results.iter().filter(|&&r| r == InputResult::Correct).count();
 
-        compute_score(
-            self.keystrokes,
-            self.correct_keystrokes,
-            correct_chars,
-            elapsed,
-        )
+        compute_score(self.keystrokes, self.correct_keystrokes, correct_chars, self.duration)
     }
 }
 
@@ -152,76 +154,77 @@ pub struct RestartButton {
     pub selected: bool,
 }
 
-pub struct Game {
-    screen: Screen,
-    duration_choice: DurationChoice,
-    round: Round,
-    ctrl_pressed: bool,
+struct Settings {
+    duration: DurationChoice,
     /// Scale factor applied to the whole UI, on top of the OS one.
     zoom: f32,
-    restart_button: RestartButton,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            duration: Default::default(),
+            zoom: 1.0,
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct Game {
+    screen: Screen,
+    settings: Settings,
 }
 
 impl Game {
-    pub fn boot() -> Self {
-        Self {
-            screen: Screen::Menu,
-            duration_choice: DurationChoice::default(),
-            round: Round::new(),
-            ctrl_pressed: false,
-            zoom: 1.0,
-            restart_button: RestartButton::default(),
-        }
-    }
-
     pub fn update(&mut self, message: Message) {
         match message {
             Message::Tick => {
-                if self.remaining_time().is_zero() {
-                    self.screen = Screen::Results;
+                if let Screen::Typing { round, .. } = &self.screen
+                    && round.remaining().is_zero()
+                {
+                    self.screen = Screen::Results { score: round.score() };
                 }
             }
             Message::Input(c) => {
-                if let Screen::Typing = self.screen {
-                    self.round.type_char(c);
-                    self.restart_button.selected = false;
+                if let Screen::Typing { round, restart_button } = &mut self.screen {
+                    round.type_char(c);
+                    restart_button.selected = false;
                 }
             }
-            Message::Backspace => {
-                if let Screen::Typing = self.screen {
-                    self.round.backspace(self.ctrl_pressed);
+            Message::Backspace { word } => {
+                if let Screen::Typing { round, .. } = &mut self.screen {
+                    round.backspace(word);
                 }
-            }
-            Message::KeyboardModifiersChanged { ctrl } => {
-                self.ctrl_pressed = ctrl;
             }
             Message::Start | Message::Restart => self.start_round(),
             Message::SelectDuration(choice) => {
-                self.duration_choice = choice;
+                self.settings.duration = choice;
             }
             Message::BackToMenu => {
                 self.screen = Screen::Menu;
             }
             Message::ZoomIn => {
-                self.zoom = (self.zoom + ZOOM_STEP).min(MAX_ZOOM);
+                self.settings.zoom = (self.settings.zoom + ZOOM_STEP).min(MAX_ZOOM);
             }
             Message::ZoomOut => {
-                self.zoom = (self.zoom - ZOOM_STEP).max(MIN_ZOOM);
+                self.settings.zoom = (self.settings.zoom - ZOOM_STEP).max(MIN_ZOOM);
             }
             Message::ZoomReset => {
-                self.zoom = 1.0;
+                self.settings.zoom = 1.0;
             }
             Message::RestartHovered(hovered) => {
-                self.restart_button.hovered = hovered;
+                if let Screen::Typing { restart_button, .. } = &mut self.screen {
+                    restart_button.hovered = hovered;
+                }
             }
             Message::ToggleRestartSelected => {
-                if let Screen::Typing = self.screen {
-                    self.restart_button.selected = !self.restart_button.selected;
+                if let Screen::Typing { restart_button, .. } = &mut self.screen {
+                    restart_button.selected = !restart_button.selected;
                 }
             }
             Message::Confirm => {
-                if let Screen::Typing = self.screen
-                    && self.restart_button.selected
+                if let Screen::Typing { restart_button, .. } = &self.screen
+                    && restart_button.selected
                 {
                     self.start_round();
                 }
@@ -230,38 +233,35 @@ impl Game {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
-        match self.screen {
-            Screen::Menu => view::menu(self.duration_choice),
-            Screen::Typing => view::typing(&self.round, self.remaining_time(), self.restart_button),
-            Screen::Results => view::results(
-                self.round.score(self.duration_choice.as_duration()),
-                self.duration_choice,
-            ),
+        match &self.screen {
+            Screen::Menu => view::menu(self.settings.duration),
+            Screen::Typing { round, restart_button } => view::typing(round, round.remaining(), *restart_button),
+            Screen::Results { score } => view::results(*score),
         }
     }
 
     pub fn scale_factor(&self) -> f32 {
-        self.zoom
+        self.settings.zoom
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
         // Zoom works on every screen. Typing input is ignored by `update` outside a round.
-        let tick = if matches!(self.screen, Screen::Typing) && self.round.started() {
+        let tick = if let Screen::Typing { round, .. } = &self.screen
+            && round.started()
+        {
             iced::time::every(Duration::from_millis(100)).map(|_| Message::Tick)
         } else {
             Subscription::none()
         };
 
         let keyboard = keyboard::listen().filter_map(|event| match event {
-            keyboard::Event::ModifiersChanged(modifiers) => {
-                Some(Message::KeyboardModifiersChanged {
-                    ctrl: modifiers.control(),
-                })
-            }
             keyboard::Event::KeyPressed {
                 key: Key::Named(Named::Backspace),
+                modifiers,
                 ..
-            } => Some(Message::Backspace),
+            } => Some(Message::Backspace {
+                word: modifiers.control(),
+            }),
             keyboard::Event::KeyPressed {
                 key: Key::Named(Named::Tab),
                 ..
@@ -280,11 +280,9 @@ impl Game {
                 Key::Character("0") => Some(Message::ZoomReset),
                 _ => None,
             },
-            keyboard::Event::KeyPressed { text: Some(t), .. } => t
-                .chars()
-                .next()
-                .filter(|c| !c.is_control())
-                .map(Message::Input),
+            keyboard::Event::KeyPressed { text: Some(t), .. } => {
+                t.chars().next().filter(|c| !c.is_control()).map(Message::Input)
+            }
             _ => None,
         });
 
@@ -292,16 +290,15 @@ impl Game {
     }
 
     fn start_round(&mut self) {
-        self.round = Round::new();
-        self.restart_button.selected = false;
-        // Coming from another screen the cursor can't be over the button yet.
-        if !matches!(self.screen, Screen::Typing) {
-            self.restart_button.hovered = false;
+        let duration = self.settings.duration.as_duration();
+        if let Screen::Typing { round, restart_button } = &mut self.screen {
+            *round = Round::new(duration);
+            restart_button.selected = false;
+        } else {
+            self.screen = Screen::Typing {
+                round: Round::new(duration),
+                restart_button: RestartButton::default(),
+            };
         }
-        self.screen = Screen::Typing;
-    }
-
-    fn remaining_time(&self) -> Duration {
-        self.round.remaining(self.duration_choice.as_duration())
     }
 }

@@ -9,7 +9,7 @@ mod words;
 use crate::game::Game;
 
 fn main() -> iced::Result {
-    iced::application(Game::boot, Game::update, Game::view)
+    iced::application(Game::default, Game::update, Game::view)
         .subscription(Game::subscription)
         .scale_factor(Game::scale_factor)
         .run()
