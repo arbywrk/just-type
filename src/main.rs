@@ -2,8 +2,8 @@
 
 mod game;
 mod score;
+mod screen;
 mod typing_text;
-mod view;
 mod words;
 
 use crate::game::Game;

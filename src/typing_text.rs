@@ -12,7 +12,7 @@ use iced::{
     alignment,
 };
 
-use crate::{game::InputResult, words};
+use crate::{screen::typing::InputResult, words};
 
 const CARET_WIDTH: f32 = 2.0;
 
