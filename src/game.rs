@@ -84,9 +84,12 @@ impl Game {
             }
             Message::Typing(message) => {
                 if let Screen::Typing(state) = &mut self.screen
-                    && let Some(typing::Event::Finished(score)) = state.update(message)
+                    && let Some(event) = state.update(message)
                 {
-                    self.screen = Screen::Results(results::State::new(score));
+                    match event {
+                        typing::Event::Finished(score) => self.screen = Screen::Results(results::State::new(score)),
+                        typing::Event::Exit => self.screen = Screen::Menu(menu::State),
+                    }
                 }
             }
             Message::Results(message) => {

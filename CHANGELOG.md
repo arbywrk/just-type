@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add exit button in the typing screen
+
 ### Fixed
 
 - Terminal opening with the application on windows.

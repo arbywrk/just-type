@@ -6,7 +6,7 @@ use std::{
 use iced::{
     Alignment, Element, Font, Subscription,
     keyboard::{self, Key, key::Named},
-    widget::{center, center_x, column, row, space, svg, text},
+    widget::{center, center_x, column, container, row, space, stack, svg, text},
 };
 
 use crate::{
@@ -21,6 +21,10 @@ const TEXT_BUFFER: usize = 200;
 /// The typing text and timer.
 const FONT_SIZE: f32 = 28.0;
 const ICON_SIZE: f32 = FONT_SIZE;
+/// Smaller than the restart button, since leaving is a secondary action.
+const EXIT_ICON_SIZE: f32 = ICON_SIZE * 0.75;
+/// Distance of the exit button from the window's corner.
+const CORNER_PADDING: f32 = 16.0;
 /// Max width of the typing area. Lines wrap to fit it.
 const TEXT_WIDTH: f32 = 820.0;
 const VISIBLE_LINES: usize = 3;
@@ -30,6 +34,12 @@ static RESTART_ICON: LazyLock<svg::Handle> = LazyLock::new(|| {
     svg::Handle::from_memory(include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/resources/icons/restart.svg"
+    )))
+});
+static EXIT_ICON: LazyLock<svg::Handle> = LazyLock::new(|| {
+    svg::Handle::from_memory(include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/resources/icons/angle-left.svg"
     )))
 });
 
@@ -45,10 +55,13 @@ pub enum Message {
     /// Presses the restart button if it is selected.
     ActivateSelected,
     Restart,
+    ExitHovered(bool),
+    Exit,
 }
 
 pub enum Event {
     Finished(Score),
+    Exit,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -145,6 +158,8 @@ struct RestartButton {
 pub struct State {
     round: Round,
     restart_button: RestartButton,
+    /// The exit button can't be selected with Tab, so only its hover is tracked.
+    exit_hovered: bool,
 }
 
 impl State {
@@ -152,6 +167,7 @@ impl State {
         Self {
             round: Round::new(duration),
             restart_button: RestartButton::default(),
+            exit_hovered: false,
         }
     }
 
@@ -189,6 +205,11 @@ impl State {
                 self.restart();
                 None
             }
+            Message::ExitHovered(hovered) => {
+                self.exit_hovered = hovered;
+                None
+            }
+            Message::Exit => Some(Event::Exit),
         }
     }
 
@@ -229,13 +250,25 @@ impl State {
             Message::RestartHovered,
         );
 
-        center(
+        // Hidden mid-round like the restart button, but only revealed by hovering.
+        let exit_button = icon_button(
+            EXIT_ICON.clone(),
+            EXIT_ICON_SIZE,
+            !self.round.started(),
+            self.exit_hovered,
+            Message::Exit,
+            Message::ExitHovered,
+        );
+
+        let content = center(
             column![header, typing_text, center_x(restart_button)]
                 .spacing(16)
                 .max_width(TEXT_WIDTH),
         )
-        .padding(40)
-        .into()
+        .padding(40);
+
+        // Layered over the content so it sits in the window's corner without moving the text.
+        stack![content, container(exit_button).padding(CORNER_PADDING)].into()
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
