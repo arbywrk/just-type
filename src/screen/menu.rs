@@ -53,9 +53,7 @@ impl State {
             column![
                 column![
                     text("just-type").size(TITLE_SIZE).font(Font::MONOSPACE),
-                    text("Pick a duration, then start typing.")
-                        .size(SMALL_SIZE)
-                        .color(MUTED),
+                    text("Set the time, then start typing.").size(SMALL_SIZE).color(MUTED),
                 ]
                 .spacing(8)
                 .align_x(Alignment::Center),

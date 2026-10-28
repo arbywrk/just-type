@@ -14,5 +14,6 @@ fn main() -> iced::Result {
     iced::application(Game::default, Game::update, Game::view)
         .subscription(Game::subscription)
         .scale_factor(Game::scale_factor)
+        .title("Just Type")
         .run()
 }
