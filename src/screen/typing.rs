@@ -33,13 +33,13 @@ const VISIBLE_LINES: usize = 3;
 static RESTART_ICON: LazyLock<svg::Handle> = LazyLock::new(|| {
     svg::Handle::from_memory(include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/resources/icons/restart.svg"
+        "/resources/icons/view-refresh-symbolic.svg"
     )))
 });
 static EXIT_ICON: LazyLock<svg::Handle> = LazyLock::new(|| {
     svg::Handle::from_memory(include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/resources/icons/angle-left.svg"
+        "/resources/icons/go-previous-symbolic.svg"
     )))
 });
 

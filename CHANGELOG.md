@@ -9,11 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add exit button in the typing screen
+- Exit button in the upper left corner of the typing screen to go back to the menu.
+- Zoom for the whole interface with Ctrl + Plus and Ctrl + Minus, and Ctrl + 0 to reset it.
+- Window title.
+- The project is now licensed under GPL-3.0-or-later.
 
 ### Fixed
 
-- Terminal opening with the application on windows.
+- Terminal opening with the application on Windows.
+- Ctrl and Cmd shortcuts are no longer typed as characters.
 
 ## [0.3.0] - 2026-10-27
 

@@ -2,6 +2,7 @@
 name = "just-type"
 version = "0.2.0"
 edition = "2024"
+license = "GPL-3.0-or-later"
 
 [dependencies]
 iced = { version = "0.14.0", features = ["advanced", "tokio", "svg"] }
