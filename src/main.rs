@@ -3,7 +3,9 @@
 mod game;
 mod score;
 mod screen;
+mod style;
 mod typing_text;
+mod widget;
 mod words;
 
 use crate::game::Game;

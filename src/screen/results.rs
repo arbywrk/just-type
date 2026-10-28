@@ -5,7 +5,7 @@ use iced::{
 
 use crate::{
     score::Score,
-    screen::{BODY_SIZE, MUTED, SMALL_SIZE},
+    style::{BODY_SIZE, MUTED, SMALL_SIZE},
 };
 
 const STAT_SIZE: f32 = 56.0;

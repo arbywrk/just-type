@@ -1,15 +1,19 @@
-use std::time::{Duration, Instant};
+use std::{
+    sync::LazyLock,
+    time::{Duration, Instant},
+};
 
 use iced::{
-    Alignment, Border, Element, Font, Subscription, Theme,
+    Alignment, Element, Font, Subscription,
     keyboard::{self, Key, key::Named},
-    widget::{button, center, center_x, column, mouse_area, row, space, svg, text},
+    widget::{center, center_x, column, row, space, svg, text},
 };
 
 use crate::{
     score::{Score, compute_score},
-    screen::{CARET, CORRECT, MUTED, SMALL_SIZE, WRONG},
+    style::{CARET, CORRECT, MUTED, SMALL_SIZE, WRONG},
     typing_text::{self, TypingText},
+    widget::icon_button,
     words,
 };
 
@@ -17,21 +21,29 @@ const TEXT_BUFFER: usize = 200;
 /// The typing text and timer.
 const FONT_SIZE: f32 = 28.0;
 const ICON_SIZE: f32 = FONT_SIZE;
-/// Space between an icon and its button border, which also enlarges the hitbox.
-const ICON_PADDING: f32 = 8.0;
-const CORNER_RADIUS: f32 = 8.0;
 /// Max width of the typing area. Lines wrap to fit it.
 const TEXT_WIDTH: f32 = 820.0;
 const VISIBLE_LINES: usize = 3;
+
+/// Loaded once and reused, instead of on every redraw.
+static RESTART_ICON: LazyLock<svg::Handle> = LazyLock::new(|| {
+    svg::Handle::from_memory(include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/resources/icons/restart.svg"
+    )))
+});
 
 #[derive(Debug, Clone)]
 pub enum Message {
     Tick,
     Input(char),
-    Backspace { word: bool },
+    Backspace {
+        word: bool,
+    },
     RestartHovered(bool),
     ToggleRestartSelected,
-    Confirm,
+    /// Presses the restart button if it is selected.
+    ActivateSelected,
     Restart,
 }
 
@@ -167,7 +179,7 @@ impl State {
                 self.restart_button.selected = !self.restart_button.selected;
                 None
             }
-            Message::Confirm => {
+            Message::ActivateSelected => {
                 if self.restart_button.selected {
                     self.restart();
                 }
@@ -207,43 +219,15 @@ impl State {
             .style(text::primary);
         let header = row![hint, space::horizontal(), timer].align_y(Alignment::Center);
 
-        // Hidden mid-round so it doesn't distract, full contrast when hovered or selected.
-        let highlighted = self.restart_button.hovered || self.restart_button.selected;
-        let opacity = if self.round.started() && !highlighted { 0.0 } else { 1.0 };
-        let restart_color = move |theme: &Theme| {
-            if highlighted { theme.palette().text } else { MUTED }
-        };
-
-        let restart_icon = svg(svg::Handle::from_memory(include_bytes!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/resources/icons/restart.svg"
-        ))))
-        .width(ICON_SIZE)
-        .height(ICON_SIZE)
-        .opacity(opacity)
-        .style(move |theme: &Theme, _| svg::Style {
-            color: Some(restart_color(theme)),
-        });
-        let restart_button = mouse_area(
-            button(restart_icon)
-                .padding(ICON_PADDING)
-                .style(move |theme: &Theme, _| {
-                    let color = restart_color(theme).scale_alpha(opacity);
-                    button::Style {
-                        background: None,
-                        text_color: color,
-                        border: Border {
-                            color,
-                            width: 1.0,
-                            radius: CORNER_RADIUS.into(),
-                        },
-                        ..button::Style::default()
-                    }
-                })
-                .on_press(Message::Restart),
-        )
-        .on_enter(Message::RestartHovered(true))
-        .on_exit(Message::RestartHovered(false));
+        // Hidden mid-round so it doesn't distract, unless hovered or selected.
+        let restart_button = icon_button(
+            RESTART_ICON.clone(),
+            ICON_SIZE,
+            !self.round.started(),
+            self.restart_button.hovered || self.restart_button.selected,
+            Message::Restart,
+            Message::RestartHovered,
+        );
 
         center(
             column![header, typing_text, center_x(restart_button)]
@@ -261,29 +245,7 @@ impl State {
             Subscription::none()
         };
 
-        let keyboard = keyboard::listen().filter_map(|event| match event {
-            keyboard::Event::KeyPressed {
-                key: Key::Named(Named::Backspace),
-                modifiers,
-                ..
-            } => Some(Message::Backspace {
-                word: modifiers.control(),
-            }),
-            keyboard::Event::KeyPressed {
-                key: Key::Named(Named::Tab),
-                ..
-            } => Some(Message::ToggleRestartSelected),
-            keyboard::Event::KeyPressed {
-                key: Key::Named(Named::Enter),
-                ..
-            } => Some(Message::Confirm),
-            // Shortcuts like zoom are handled by the app, not typed.
-            keyboard::Event::KeyPressed { modifiers, .. } if modifiers.command() => None,
-            keyboard::Event::KeyPressed { text: Some(t), .. } => {
-                t.chars().next().filter(|c| !c.is_control()).map(Message::Input)
-            }
-            _ => None,
-        });
+        let keyboard = keyboard::listen().filter_map(key_to_message);
 
         Subscription::batch([tick, keyboard])
     }
@@ -293,5 +255,98 @@ impl State {
     fn restart(&mut self) {
         self.round = Round::new(self.round.duration);
         self.restart_button.selected = false;
+    }
+}
+
+fn key_to_message(event: keyboard::Event) -> Option<Message> {
+    match event {
+        keyboard::Event::KeyPressed {
+            key: Key::Named(Named::Backspace),
+            modifiers,
+            ..
+        } => Some(Message::Backspace {
+            word: modifiers.control(),
+        }),
+        keyboard::Event::KeyPressed {
+            key: Key::Named(Named::Tab),
+            ..
+        } => Some(Message::ToggleRestartSelected),
+        keyboard::Event::KeyPressed {
+            key: Key::Named(Named::Enter),
+            ..
+        } => Some(Message::ActivateSelected),
+        // Shortcuts like zoom are handled by the app, not typed.
+        keyboard::Event::KeyPressed { modifiers, .. } if modifiers.command() => None,
+        keyboard::Event::KeyPressed { text: Some(t), .. } => {
+            t.chars().next().filter(|c| !c.is_control()).map(Message::Input)
+        }
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use iced::keyboard::{
+        Location, Modifiers,
+        key::{NativeCode, Physical},
+    };
+
+    use super::*;
+
+    fn press(key: Key, modifiers: Modifiers, text: Option<&str>) -> keyboard::Event {
+        keyboard::Event::KeyPressed {
+            key: key.clone(),
+            modified_key: key,
+            physical_key: Physical::Unidentified(NativeCode::Unidentified),
+            location: Location::Standard,
+            modifiers,
+            text: text.map(Into::into),
+            repeat: false,
+        }
+    }
+
+    fn character(c: &str, modifiers: Modifiers) -> keyboard::Event {
+        press(Key::Character(c.into()), modifiers, Some(c))
+    }
+
+    #[test]
+    fn letters_are_typed() {
+        let message = key_to_message(character("a", Modifiers::empty()));
+        assert!(matches!(message, Some(Message::Input('a'))));
+    }
+
+    #[test]
+    fn backspace_deletes_a_char() {
+        let message = key_to_message(press(Key::Named(Named::Backspace), Modifiers::empty(), None));
+        assert!(matches!(message, Some(Message::Backspace { word: false })));
+    }
+
+    #[test]
+    fn ctrl_backspace_deletes_a_word() {
+        let message = key_to_message(press(Key::Named(Named::Backspace), Modifiers::CTRL, None));
+        assert!(matches!(message, Some(Message::Backspace { word: true })));
+    }
+
+    #[test]
+    fn tab_toggles_the_restart_selection() {
+        let message = key_to_message(press(Key::Named(Named::Tab), Modifiers::empty(), Some("\t")));
+        assert!(matches!(message, Some(Message::ToggleRestartSelected)));
+    }
+
+    #[test]
+    fn enter_activates_the_selection() {
+        let message = key_to_message(press(Key::Named(Named::Enter), Modifiers::empty(), Some("\r")));
+        assert!(matches!(message, Some(Message::ActivateSelected)));
+    }
+
+    #[test]
+    fn shortcuts_are_not_typed() {
+        assert!(key_to_message(character("=", Modifiers::COMMAND)).is_none());
+    }
+
+    #[test]
+    fn control_characters_are_not_typed() {
+        let message = key_to_message(press(Key::Named(Named::Escape), Modifiers::empty(), Some("\u{1b}")));
+        assert!(message.is_none());
     }
 }

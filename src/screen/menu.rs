@@ -5,7 +5,7 @@ use iced::{
 
 use crate::{
     game::DurationChoice,
-    screen::{BODY_SIZE, MUTED, SMALL_SIZE},
+    style::{BODY_SIZE, MUTED, SMALL_SIZE},
 };
 
 const TITLE_SIZE: f32 = 48.0;
