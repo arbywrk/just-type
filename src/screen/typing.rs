@@ -33,7 +33,7 @@ static RESTART_ICON: LazyLock<svg::Handle> = LazyLock::new(|| {
     )))
 });
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Message {
     Tick,
     Input(char),
@@ -290,63 +290,60 @@ mod tests {
         Location, Modifiers,
         key::{NativeCode, Physical},
     };
+    use rstest::rstest;
 
     use super::*;
 
-    fn press(key: Key, modifiers: Modifiers, text: Option<&str>) -> keyboard::Event {
-        keyboard::Event::KeyPressed {
-            key: key.clone(),
-            modified_key: key,
-            physical_key: Physical::Unidentified(NativeCode::Unidentified),
-            location: Location::Standard,
-            modifiers,
-            text: text.map(Into::into),
-            repeat: false,
+    mod helpers {
+        use super::*;
+
+        pub fn press(key: Key, modifiers: Modifiers, text: Option<&str>) -> keyboard::Event {
+            keyboard::Event::KeyPressed {
+                key: key.clone(),
+                modified_key: key,
+                physical_key: Physical::Unidentified(NativeCode::Unidentified),
+                location: Location::Standard,
+                modifiers,
+                text: text.map(Into::into),
+                repeat: false,
+            }
+        }
+
+        pub fn character(c: &str, modifiers: Modifiers) -> keyboard::Event {
+            press(Key::Character(c.into()), modifiers, Some(c))
         }
     }
 
-    fn character(c: &str, modifiers: Modifiers) -> keyboard::Event {
-        press(Key::Character(c.into()), modifiers, Some(c))
-    }
+    mod key_to_message {
+        use super::*;
 
-    #[test]
-    fn letters_are_typed() {
-        let message = key_to_message(character("a", Modifiers::empty()));
-        assert!(matches!(message, Some(Message::Input('a'))));
-    }
+        #[rstest]
+        #[case::letter(helpers::character("a", Modifiers::empty()), Message::Input('a'))]
+        #[case::backspace(
+            helpers::press(Key::Named(Named::Backspace), Modifiers::empty(), None),
+            Message::Backspace { word: false },
+        )]
+        #[case::ctrl_backspace(
+            helpers::press(Key::Named(Named::Backspace), Modifiers::CTRL, None),
+            Message::Backspace { word: true },
+        )]
+        #[case::tab(
+            helpers::press(Key::Named(Named::Tab), Modifiers::empty(), Some("\t")),
+            Message::ToggleRestartSelected
+        )]
+        #[case::enter(
+            helpers::press(Key::Named(Named::Enter), Modifiers::empty(), Some("\r")),
+            Message::ActivateSelected
+        )]
+        fn maps_key_to_its_message(#[case] event: keyboard::Event, #[case] expected: Message) {
+            assert_eq!(key_to_message(event), Some(expected));
+        }
 
-    #[test]
-    fn backspace_deletes_a_char() {
-        let message = key_to_message(press(Key::Named(Named::Backspace), Modifiers::empty(), None));
-        assert!(matches!(message, Some(Message::Backspace { word: false })));
-    }
-
-    #[test]
-    fn ctrl_backspace_deletes_a_word() {
-        let message = key_to_message(press(Key::Named(Named::Backspace), Modifiers::CTRL, None));
-        assert!(matches!(message, Some(Message::Backspace { word: true })));
-    }
-
-    #[test]
-    fn tab_toggles_the_restart_selection() {
-        let message = key_to_message(press(Key::Named(Named::Tab), Modifiers::empty(), Some("\t")));
-        assert!(matches!(message, Some(Message::ToggleRestartSelected)));
-    }
-
-    #[test]
-    fn enter_activates_the_selection() {
-        let message = key_to_message(press(Key::Named(Named::Enter), Modifiers::empty(), Some("\r")));
-        assert!(matches!(message, Some(Message::ActivateSelected)));
-    }
-
-    #[test]
-    fn shortcuts_are_not_typed() {
-        assert!(key_to_message(character("=", Modifiers::COMMAND)).is_none());
-    }
-
-    #[test]
-    fn control_characters_are_not_typed() {
-        let message = key_to_message(press(Key::Named(Named::Escape), Modifiers::empty(), Some("\u{1b}")));
-        assert!(message.is_none());
+        #[rstest]
+        #[case::shortcut(helpers::character("=", Modifiers::COMMAND))]
+        #[case::control_character(helpers::press(Key::Named(Named::Escape), Modifiers::empty(), Some("\u{1b}")))]
+        fn ignores_key(#[case] event: keyboard::Event) {
+            assert_eq!(key_to_message(event), None);
+        }
     }
 }

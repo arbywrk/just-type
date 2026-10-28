@@ -86,6 +86,8 @@ pub fn visible_lines(lines: &[Range<usize>], cursor: usize, count: usize) -> &[R
 
 #[cfg(test)]
 mod tests {
+    use rstest::{fixture, rstest};
+
     use super::*;
 
     mod helpers {
@@ -102,21 +104,16 @@ mod tests {
     mod wrap_lines {
         use super::*;
 
-        #[test]
-        fn wraps_after_spaces_within_width() {
-            let text = helpers::chars("aa bb cc dd");
+        #[rstest]
+        #[case::wraps_after_spaces_within_width("aa bb cc dd", 6.0, vec![0..6, 6..11])]
+        #[case::overlong_word_gets_its_own_line("a bbbbbbbb c", 4.0, vec![0..2, 2..11, 11..12])]
+        fn wraps(#[case] text: &str, #[case] max_width: f32, #[case] expected: Vec<Range<usize>>) {
+            let text = helpers::chars(text);
 
-            assert_eq!(wrap_lines(&text, 6.0, helpers::unit_width), [0..6, 6..11]);
+            assert_eq!(wrap_lines(&text, max_width, helpers::unit_width), expected);
         }
 
-        #[test]
-        fn overlong_word_gets_its_own_line() {
-            let text = helpers::chars("a bbbbbbbb c");
-
-            assert_eq!(wrap_lines(&text, 4.0, helpers::unit_width), [0..2, 2..11, 11..12]);
-        }
-
-        #[test]
+        #[rstest]
         fn appending_words_keeps_earlier_lines() {
             let short = wrap_lines(&helpers::chars("aa bb cc"), 6.0, helpers::unit_width);
             let long = wrap_lines(&helpers::chars("aa bb cc dd ee"), 6.0, helpers::unit_width);
@@ -128,13 +125,17 @@ mod tests {
     mod visible_lines {
         use super::*;
 
-        #[test]
-        fn keeps_cursor_line_second_once_past_the_first() {
-            let lines = [0..3, 3..6, 6..9, 9..12];
+        #[fixture]
+        fn lines() -> Vec<Range<usize>> {
+            vec![0..3, 3..6, 6..9, 9..12]
+        }
 
-            assert_eq!(visible_lines(&lines, 1, 3), [0..3, 3..6, 6..9]);
-            assert_eq!(visible_lines(&lines, 7, 3), [3..6, 6..9, 9..12]);
-            assert_eq!(visible_lines(&lines, 10, 3), [6..9, 9..12]);
+        #[rstest]
+        #[case::starts_at_the_top_on_the_first_line(1, vec![0..3, 3..6, 6..9])]
+        #[case::keeps_cursor_line_second_once_past_the_first(7, vec![3..6, 6..9, 9..12])]
+        #[case::shows_fewer_lines_at_the_end(10, vec![6..9, 9..12])]
+        fn shows(lines: Vec<Range<usize>>, #[case] cursor: usize, #[case] expected: Vec<Range<usize>>) {
+            assert_eq!(visible_lines(&lines, cursor, 3), expected);
         }
     }
 }
