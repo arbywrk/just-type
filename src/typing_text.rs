@@ -269,7 +269,7 @@ where
         state.reshape_visible(self);
         state.place_caret(self);
 
-        // Always reserve every line, so the layout doesn't shift near the end of the text.
+        // always reserve every line, so the layout doesn't shift near the end of the text.
         let lines = self.visible_lines as f32;
         let height = lines * self.line_height() + (lines - 1.0).max(0.0) * self.line_spacing;
         layout::Node::new(Size::new(width, height))

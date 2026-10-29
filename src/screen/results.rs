@@ -5,7 +5,7 @@ use iced::{
 };
 
 use crate::{
-    score::Score,
+    score::{Records, Score},
     style::{BODY_SIZE, MUTED, SMALL_SIZE},
     widget::focus_ring,
 };
@@ -30,6 +30,7 @@ fn cycle(selected: Option<Selected>, backwards: bool) -> Selected {
 
 pub struct State {
     score: Score,
+    records: Option<Records>,
     /// Nothing is selected until Tab is pressed.
     selected: Option<Selected>,
 }
@@ -50,8 +51,12 @@ pub enum Event {
 }
 
 impl State {
-    pub fn new(score: Score) -> Self {
-        Self { score, selected: None }
+    pub fn new(score: Score, records: Option<Records>) -> Self {
+        Self {
+            score,
+            records,
+            selected: None,
+        }
     }
 
     pub fn update(&mut self, message: Message) -> Option<Event> {
@@ -62,7 +67,7 @@ impl State {
                 self.selected = Some(cycle(self.selected, backwards));
                 None
             }
-            // Restart is the default action, like a form's submit button.
+            // restart is the default action, like a form's submit button.
             Message::ActivateSelected => match self.selected {
                 None | Some(Selected::Restart) => Some(Event::Restart),
                 Some(Selected::Menu) => Some(Event::BackToMenu),
@@ -93,6 +98,18 @@ impl State {
         let test_info = text(format!("{}s test", self.score.duration.as_secs()))
             .size(SMALL_SIZE)
             .color(MUTED);
+        let new_best = self
+            .records
+            .filter(|records| records.new_personal_best)
+            .map(|_| text("new personal best").size(BODY_SIZE).style(text::primary));
+        let history = self.records.map(|records| {
+            text(format!(
+                "best {:.0}  -  last {} avg {:.0}",
+                records.personal_best, records.recent_count, records.recent_average
+            ))
+            .size(SMALL_SIZE)
+            .color(MUTED)
+        });
 
         let restart = button(text("Restart").size(BODY_SIZE))
             .padding([10, 32])
@@ -101,7 +118,7 @@ impl State {
             .padding([10, 32])
             .style(button::secondary)
             .on_press(Message::BackToMenu);
-        // The rings reserve space around each button, so less spacing keeps the same gap.
+        // rings reserve space around each button, so less spacing keeps the same gap.
         let buttons = row![
             focus_ring(restart, self.selected == Some(Selected::Restart)),
             focus_ring(menu, self.selected == Some(Selected::Menu)),
@@ -110,7 +127,9 @@ impl State {
 
         center(
             column![
-                column![stats, test_info].spacing(16).align_x(Alignment::Center),
+                column![new_best, stats, test_info, history]
+                    .spacing(16)
+                    .align_x(Alignment::Center),
                 buttons,
             ]
             .spacing(48)
@@ -177,12 +196,15 @@ mod tests {
         const SHIFT_TAB: Message = Message::CycleButtonSelect { backwards: true };
 
         fn state() -> State {
-            State::new(Score {
-                raw_wpm: 0.0,
-                net_wpm: 0.0,
-                accuracy: 100.0,
-                duration: Duration::from_secs(15),
-            })
+            State::new(
+                Score {
+                    raw_wpm: 0.0,
+                    net_wpm: 0.0,
+                    accuracy: 100.0,
+                    duration: Duration::from_secs(15),
+                },
+                None,
+            )
         }
 
         #[rstest]

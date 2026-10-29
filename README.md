@@ -5,9 +5,30 @@ edges, but if you like it feel free too play and contribute.
 
 # Building
 
+> Note: building it from source necessitates some dependencies which are not documented outside the nix flake.
+
 ```bash
 # for debug builds just ommit the release flag
 cargo build --release
+```
+
+# Where files are saved
+
+Just Type keeps its settings in `settings.json` and your finished rounds in `history.sqlite3`.
+
+| Platform      | Settings                                             | History                                  |
+| ------------- | ---------------------------------------------------- | ---------------------------------------- |
+| Linux         | `~/.config/just-type`                                | `~/.local/share/just-type`               |
+| macOS         | `~/Library/Application Support/com.arbywrk.JustType` | same as settings                         |
+| Windows       | `%APPDATA%\arbywrk\JustType\config`                  | `%APPDATA%\arbywrk\JustType\data`        |
+| Debug builds  | `target/debug/data/config`                           | `target/debug/data/data`                 |
+
+On Linux, `$XDG_CONFIG_HOME` and `$XDG_DATA_HOME` are respected. To use other folders, set
+`JUST_TYPE_CONFIG_HOME` and `JUST_TYPE_DATA_HOME` to the folders the files should go in directly:
+
+```bash
+# to keep this persistent you can put them in your shell's rc file (.bashrc, .zshrc, etc.)
+JUST_TYPE_CONFIG_HOME=/tmp/just-type JUST_TYPE_DATA_HOME=/tmp/just-type just-type
 ```
 
 # License

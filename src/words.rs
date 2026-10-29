@@ -77,7 +77,7 @@ pub fn visible_lines(lines: &[Range<usize>], cursor: usize, count: usize) -> &[R
         .iter()
         .position(|line| line.contains(&cursor))
         .unwrap_or(lines.len().saturating_sub(1));
-    // Keep the current line in the middle once past the first, so there's always one line ahead.
+    // keep the current line in the middle once past the first, so there's always one line ahead.
     let first_visible = current_line.saturating_sub(1);
     let last_visible = (first_visible + count).min(lines.len());
 

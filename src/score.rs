@@ -9,6 +9,18 @@ pub struct Score {
     pub duration: Duration,
 }
 
+/// How a [`Score`] compares with earlier rounds of the same test.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Records {
+    /// The best wpm so far, this round included.
+    pub personal_best: f64,
+    /// Whether this round beat the previous best.
+    pub new_personal_best: bool,
+    /// Average wpm of the last `recent_count` rounds, this one included.
+    pub recent_average: f64,
+    pub recent_count: usize,
+}
+
 fn wpm(chars: usize, elapsed: Duration) -> f64 {
     let minutes = elapsed.as_secs_f64() / 60.0;
     if minutes == 0.0 {

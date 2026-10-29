@@ -1,11 +1,21 @@
-use std::time::Duration;
+use std::{
+    path::PathBuf,
+    time::{Duration, SystemTime},
+};
 
 use iced::{
     Element, Subscription,
     keyboard::{self, Key},
 };
+use serde::{Deserialize, Serialize};
 
-use crate::screen::{Screen, menu, results, typing};
+use crate::{
+    database::Database,
+    paths::Paths,
+    score::{Records, Score},
+    screen::{Screen, menu, results, typing},
+    settings::Settings,
+};
 
 const ZOOM_STEP: f32 = 0.1;
 const MIN_ZOOM: f32 = 0.5;
@@ -21,11 +31,14 @@ pub enum Message {
     Results(results::Message),
 }
 
-#[derive(Default, Clone, Debug, Copy, Eq, PartialEq)]
+#[derive(Default, Clone, Debug, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub enum DurationChoice {
     #[default]
+    #[serde(rename = "15s")]
     Secs15,
+    #[serde(rename = "30s")]
     Secs30,
+    #[serde(rename = "60s")]
     Secs60,
 }
 
@@ -57,45 +70,48 @@ impl DurationChoice {
     }
 }
 
-struct Settings {
-    duration: DurationChoice,
-    /// Scale factor applied to the whole UI, on top of the OS one.
-    zoom: f32,
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        Self {
-            duration: Default::default(),
-            zoom: 1.0,
-        }
-    }
-}
-
-#[derive(Default)]
 pub struct Game {
     screen: Screen,
     settings: Settings,
+    settings_path: Option<PathBuf>,
+    /// `None` when the history couldn't be opened.
+    /// Rounds still work without records.
+    database: Option<Database>,
 }
 
 impl Game {
+    pub fn new() -> Self {
+        let paths = Paths::new();
+        let mut settings = paths.settings.as_deref().map(Settings::load).unwrap_or_default();
+        settings.zoom = settings.zoom.clamp(MIN_ZOOM, MAX_ZOOM);
+        let database = paths.database.as_deref().and_then(|path| {
+            Database::open(path)
+                .inspect_err(|error| eprintln!("Couldn't open the history at {}: {error}", path.display()))
+                .ok()
+        });
+
+        Self {
+            screen: Screen::Menu(menu::State::new(settings.duration)),
+            settings,
+            settings_path: paths.settings,
+            database,
+        }
+    }
+
     pub fn update(&mut self, message: Message) {
         match message {
-            Message::ZoomIn => {
-                self.settings.zoom = (self.settings.zoom + ZOOM_STEP).min(MAX_ZOOM);
-            }
-            Message::ZoomOut => {
-                self.settings.zoom = (self.settings.zoom - ZOOM_STEP).max(MIN_ZOOM);
-            }
-            Message::ZoomReset => {
-                self.settings.zoom = 1.0;
-            }
+            Message::ZoomIn => self.set_zoom(self.settings.zoom + ZOOM_STEP),
+            Message::ZoomOut => self.set_zoom(self.settings.zoom - ZOOM_STEP),
+            Message::ZoomReset => self.set_zoom(1.0),
             Message::Menu(message) => {
                 if let Screen::Menu(state) = &mut self.screen
                     && let Some(event) = state.update(message)
                 {
                     match event {
-                        menu::Event::SelectDuration(choice) => self.settings.duration = choice,
+                        menu::Event::SelectDuration(choice) => {
+                            self.settings.duration = choice;
+                            self.save_settings();
+                        }
                         menu::Event::Start => self.start_round(),
                     }
                 }
@@ -105,7 +121,10 @@ impl Game {
                     && let Some(event) = state.update(message)
                 {
                     match event {
-                        typing::Event::Finished(score) => self.screen = Screen::Results(results::State::new(score)),
+                        typing::Event::Finished(score) => {
+                            let records = self.record(&score);
+                            self.screen = Screen::Results(results::State::new(score, records));
+                        }
                         typing::Event::Exit => self.show_menu(),
                     }
                 }
@@ -136,7 +155,7 @@ impl Game {
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
-        // Zoom works on every screen, on top of whatever the screen listens to.
+        // zoom works on every screen, on top of whatever the screen listens to.
         let zoom = keyboard::listen().filter_map(|event| match event {
             keyboard::Event::KeyPressed {
                 modified_key,
@@ -158,6 +177,28 @@ impl Game {
         };
 
         Subscription::batch([zoom, screen])
+    }
+
+    fn set_zoom(&mut self, zoom: f32) {
+        self.settings.zoom = zoom.clamp(MIN_ZOOM, MAX_ZOOM);
+        self.save_settings();
+    }
+
+    fn save_settings(&self) {
+        if let Some(path) = &self.settings_path
+            && let Err(error) = self.settings.save(path)
+        {
+            eprintln!("Couldn't save the settings to {}: {error}", path.display());
+        }
+    }
+
+    /// Saves the round to the history. `None` when there is no history to compare with.
+    fn record(&mut self, score: &Score) -> Option<Records> {
+        self.database
+            .as_mut()?
+            .record(score, SystemTime::now())
+            .inspect_err(|error| eprintln!("Couldn't save the result: {error}"))
+            .ok()
     }
 
     fn show_menu(&mut self) {
