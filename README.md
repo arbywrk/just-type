@@ -1,14 +1,14 @@
 # Just Type
 
-This is a little typing game for practicing touch typeing. I made it for fun and it is a bit rough around the
-edges, but if you like it feel free too play and contribute.
+This is a little typing game for practicing touch typing. I made it for fun and it is a bit rough around the
+edges, but if you like it feel free to play and contribute.
 
 # Building
 
 > Note: building it from source necessitates some dependencies which are not documented outside the nix flake.
 
 ```bash
-# for debug builds just ommit the release flag
+# for debug builds just omit the release flag
 cargo build --release
 ```
 
