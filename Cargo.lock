@@ -1610,8 +1610,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "just-type"
-version = "0.2.0"
+name = "just-type-core"
+version = "0.4.0"
+
+[[package]]
+name = "just-type-iced"
+version = "0.4.0"
 dependencies = [
  "directories",
  "iced",
