@@ -1,11 +1,14 @@
 use std::{
     path::PathBuf,
-    time::{Duration, SystemTime},
+    time::{Duration, Instant, SystemTime},
 };
 
 use iced::{
-    Element, Subscription,
+    Animation, Element, Length, Subscription, Theme,
+    animation::Easing,
     keyboard::{self, Key},
+    widget::{container, space, stack},
+    window,
 };
 use serde::{Deserialize, Serialize};
 
@@ -20,12 +23,16 @@ use crate::{
 const ZOOM_STEP: f32 = 0.1;
 const MIN_ZOOM: f32 = 0.5;
 const MAX_ZOOM: f32 = 2.0;
+/// How long the menu and results take to fade in.
+const SCREEN_FADE: Duration = Duration::from_millis(200);
 
 #[derive(Debug, Clone)]
 pub enum Message {
     ZoomIn,
     ZoomOut,
     ZoomReset,
+    /// A frame is about to be drawn while something is animating.
+    Frame(Instant),
     Menu(menu::Message),
     Typing(typing::Message),
     Results(results::Message),
@@ -77,6 +84,10 @@ pub struct Game {
     /// `None` when the history couldn't be opened.
     /// Rounds still work without records.
     database: Option<Database>,
+    /// When the current frame is drawn. Only kept up to date while something is animating.
+    now: Instant,
+    /// The current screen fading in. Done when `true`.
+    screen_fade: Animation<bool>,
 }
 
 impl Game {
@@ -95,6 +106,8 @@ impl Game {
             settings,
             settings_path: paths.settings,
             database,
+            now: Instant::now(),
+            screen_fade: Animation::new(true),
         }
     }
 
@@ -103,6 +116,7 @@ impl Game {
             Message::ZoomIn => self.set_zoom(self.settings.zoom + ZOOM_STEP),
             Message::ZoomOut => self.set_zoom(self.settings.zoom - ZOOM_STEP),
             Message::ZoomReset => self.set_zoom(1.0),
+            Message::Frame(now) => self.now = now,
             Message::Menu(message) => {
                 if let Screen::Menu(state) = &mut self.screen
                     && let Some(event) = state.update(message)
@@ -123,7 +137,7 @@ impl Game {
                     match event {
                         typing::Event::Finished(score) => {
                             let records = self.record(&score);
-                            self.screen = Screen::Results(results::State::new(score, records));
+                            self.show(Screen::Results(results::State::new(score, records)));
                         }
                         typing::Event::Exit => self.show_menu(),
                     }
@@ -143,11 +157,21 @@ impl Game {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
-        match &self.screen {
+        let screen = match &self.screen {
             Screen::Menu(state) => state.view().map(Message::Menu),
-            Screen::Typing(state) => state.view().map(Message::Typing),
+            Screen::Typing(state) => state.view(self.now).map(Message::Typing),
             Screen::Results(state) => state.view().map(Message::Results),
-        }
+        };
+
+        // The screen fades in from the background. The cover is always there, even when
+        // fully transparent, so the screen's widgets keep their state when the fade ends.
+        let cover = self.screen_fade.interpolate(1.0, 0.0, self.now);
+        let cover = container(space())
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .style(move |theme: &Theme| container::background(theme.palette().background.scale_alpha(cover)));
+
+        stack![screen, cover].into()
     }
 
     pub fn scale_factor(&self) -> f32 {
@@ -176,7 +200,19 @@ impl Game {
             Screen::Results(state) => state.subscription().map(Message::Results),
         };
 
-        Subscription::batch([zoom, screen])
+        // Frames are only needed while something moves, so the app is idle otherwise.
+        let frames = if self.is_animating() {
+            window::frames().map(Message::Frame)
+        } else {
+            Subscription::none()
+        };
+
+        Subscription::batch([zoom, screen, frames])
+    }
+
+    fn is_animating(&self) -> bool {
+        self.screen_fade.is_animating(self.now)
+            || matches!(&self.screen, Screen::Typing(state) if state.is_animating(self.now))
     }
 
     fn set_zoom(&mut self, zoom: f32) {
@@ -201,11 +237,28 @@ impl Game {
             .ok()
     }
 
+    /// Switches to `screen`. The menu and results fade in, while a round shows up at
+    /// once so typing can start right away.
+    fn show(&mut self, screen: Screen) {
+        self.screen_fade = if matches!(screen, Screen::Typing(_)) {
+            Animation::new(true)
+        } else {
+            Animation::new(false)
+                .duration(SCREEN_FADE)
+                .easing(Easing::EaseOut)
+                .go(true, Instant::now())
+        };
+        self.screen = screen;
+    }
+
     fn show_menu(&mut self) {
-        self.screen = Screen::Menu(menu::State::new(self.settings.duration));
+        self.show(Screen::Menu(menu::State::new(self.settings.duration)));
     }
 
     fn start_round(&mut self) {
-        self.screen = Screen::Typing(typing::State::new(self.settings.duration.as_duration()));
+        self.show(Screen::Typing(Box::new(typing::State::new(
+            self.settings.duration.as_duration(),
+            self.settings.caret_glide(),
+        ))));
     }
 }

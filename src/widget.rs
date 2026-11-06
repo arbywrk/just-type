@@ -16,23 +16,21 @@ const FOCUS_RING_GAP: f32 = 2.0;
 /// iced's buttons have 2px rounded corners, so the ring follows that curve around the gap.
 const FOCUS_RING_RADIUS: f32 = 2.0 + FOCUS_RING_GAP + FOCUS_RING_WIDTH;
 
-/// A square icon button with a rounded border, muted unless `highlighted`.
+/// A square icon button with a rounded border, muted unless highlighted.
 ///
-/// When `visible` is false it is hidden, but still shows while highlighted.
-/// iced doesn't give the icon the button's hover status, so the caller tracks
-/// hover through `on_hover` and passes it back in as `highlighted`.
+/// `visibility` and `highlight` go from 0 to 1, so both can fade. A hidden button still
+/// shows while highlighted. iced doesn't give the icon the button's hover status, so the
+/// caller tracks hover through `on_hover` and passes it back in as `highlight`.
 pub fn icon_button<'a, Message: Clone + 'a>(
     icon: svg::Handle,
     size: f32,
-    visible: bool,
-    highlighted: bool,
+    visibility: f32,
+    highlight: f32,
     on_press: Message,
     on_hover: impl Fn(bool) -> Message,
 ) -> Element<'a, Message> {
-    let opacity = if visible || highlighted { 1.0 } else { 0.0 };
-    let color = move |theme: &Theme| {
-        if highlighted { theme.palette().text } else { MUTED }
-    };
+    let opacity = visibility.max(highlight);
+    let color = move |theme: &Theme| mix(MUTED, theme.palette().text, highlight);
 
     let icon = svg(icon)
         .width(size)
@@ -84,4 +82,15 @@ pub fn focus_ring<'a, Message: 'a>(content: impl Into<Element<'a, Message>>, foc
             ..container::Style::default()
         })
         .into()
+}
+
+/// The color `t` of the way from `from` to `to`.
+fn mix(from: Color, to: Color, t: f32) -> Color {
+    let lerp = |a: f32, b: f32| a + (b - a) * t;
+    Color {
+        r: lerp(from.r, to.r),
+        g: lerp(from.g, to.g),
+        b: lerp(from.b, to.b),
+        a: lerp(from.a, to.a),
+    }
 }

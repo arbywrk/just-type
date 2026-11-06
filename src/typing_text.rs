@@ -1,15 +1,21 @@
 //! The text being typed, with a caret.
 
-use std::{collections::HashMap, ops::Range};
+use std::{
+    collections::HashMap,
+    ops::Range,
+    time::{Duration, Instant},
+};
 
 use iced::{
-    Color, Element, Font, Length, Pixels, Point, Rectangle, Size, Vector,
+    Animation, Color, Element, Event, Font, Length, Pixels, Point, Rectangle, Size, Vector,
     advanced::{
-        Layout, Widget, layout, mouse, renderer,
+        Clipboard, Layout, Shell, Widget, layout, mouse, renderer,
         text::{self, Alignment, LineHeight, Paragraph, Shaping, Span, Text, Wrapping},
         widget::{Tree, tree},
     },
     alignment,
+    animation::Easing,
+    window,
 };
 
 use crate::{screen::typing::InputResult, words};
@@ -32,6 +38,8 @@ pub struct TypingText<'a> {
     line_height: LineHeight,
     line_spacing: f32,
     visible_lines: usize,
+    /// How long the caret takes to glide to its next position, or `None` when it jumps.
+    glide: Option<Duration>,
     style: Style,
 }
 
@@ -46,6 +54,7 @@ impl<'a> TypingText<'a> {
             line_height: LineHeight::default(),
             line_spacing: 0.0,
             visible_lines: 3,
+            glide: None,
             style,
         }
     }
@@ -67,6 +76,11 @@ impl<'a> TypingText<'a> {
 
     pub fn visible_lines(mut self, count: usize) -> Self {
         self.visible_lines = count;
+        self
+    }
+
+    pub fn glide(mut self, glide: Option<Duration>) -> Self {
+        self.glide = glide;
         self
     }
 
@@ -129,8 +143,16 @@ struct State<P> {
     text: Vec<char>,
     lines: Vec<Range<usize>>,
     visible: Vec<VisibleLine<P>>,
-    /// Top-left of the caret, relative to the widget.
-    caret: Point,
+    /// Top of the caret, relative to the widget.
+    caret_y: f32,
+    /// Left of the caret, relative to the widget. It glides along a line.
+    caret_x: Animation<f32>,
+    /// Start of the caret's line. Moving to another line jumps instead of gliding across it.
+    caret_line: usize,
+    /// Set when the layout changes, so the caret jumps to its new place.
+    snap_caret: bool,
+    /// When the current frame is drawn.
+    now: Instant,
 }
 
 struct VisibleLine<P> {
@@ -149,7 +171,11 @@ impl<P: Paragraph<Font = Font>> State<P> {
             text: vec![],
             lines: vec![],
             visible: vec![],
-            caret: Point::ORIGIN,
+            caret_y: 0.0,
+            caret_x: Animation::new(0.0),
+            caret_line: 0,
+            snap_caret: true,
+            now: Instant::now(),
         }
     }
 
@@ -161,10 +187,12 @@ impl<P: Paragraph<Font = Font>> State<P> {
             self.word_widths.clear();
             self.visible.clear();
             self.text.clear();
+            self.snap_caret = true;
         }
         if self.max_width != max_width {
             self.max_width = max_width;
             self.text.clear();
+            self.snap_caret = true;
         }
     }
 
@@ -223,7 +251,8 @@ impl<P: Paragraph<Font = Font>> State<P> {
             .position(|line| line.range.contains(&cursor))
             .unwrap_or(self.visible.len().saturating_sub(1));
         let Some(line) = self.visible.get(row) else {
-            self.caret = Point::ORIGIN;
+            self.caret_y = 0.0;
+            self.caret_x = Animation::new(0.0);
             return;
         };
 
@@ -232,8 +261,21 @@ impl<P: Paragraph<Font = Font>> State<P> {
             .paragraph
             .grapheme_position(0, column)
             .map_or(0.0, |position| position.x);
-        let y = row as f32 * (widget.line_height() + widget.line_spacing);
-        self.caret = Point::new(x, y);
+        let line_start = line.range.start;
+
+        match widget.glide {
+            Some(_) if !self.snap_caret && line_start == self.caret_line => {
+                self.caret_x.go_mut(x, Instant::now());
+            }
+            _ => {
+                self.caret_x = Animation::new(x)
+                    .duration(widget.glide.unwrap_or_default())
+                    .easing(Easing::EaseOut);
+            }
+        }
+        self.caret_y = row as f32 * (widget.line_height() + widget.line_spacing);
+        self.caret_line = line_start;
+        self.snap_caret = false;
     }
 }
 
@@ -275,6 +317,27 @@ where
         layout::Node::new(Size::new(width, height))
     }
 
+    /// Keeps frames coming while the caret glides.
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        _layout: Layout<'_>,
+        _cursor: mouse::Cursor,
+        _renderer: &Renderer,
+        _clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        _viewport: &Rectangle,
+    ) {
+        if let Event::Window(window::Event::RedrawRequested(now)) = event {
+            let state = tree.state.downcast_mut::<State<Renderer::Paragraph>>();
+            state.now = *now;
+            if state.caret_x.is_animating(*now) {
+                shell.request_redraw();
+            }
+        }
+    }
+
     fn draw(
         &self,
         tree: &Tree,
@@ -300,8 +363,8 @@ where
         let caret_height = self.size.0;
         let caret = Rectangle::new(
             Point::new(
-                bounds.x + state.caret.x - CARET_WIDTH / 2.0,
-                bounds.y + state.caret.y + (self.line_height() - caret_height) / 2.0,
+                bounds.x + state.caret_x.interpolate_with(|x| x, state.now) - CARET_WIDTH / 2.0,
+                bounds.y + state.caret_y + (self.line_height() - caret_height) / 2.0,
             ),
             Size::new(CARET_WIDTH, caret_height),
         );

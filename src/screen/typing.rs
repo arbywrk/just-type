@@ -4,7 +4,8 @@ use std::{
 };
 
 use iced::{
-    Alignment, Element, Font, Subscription,
+    Alignment, Animation, Element, Font, Subscription,
+    animation::Easing,
     keyboard::{self, Key, key::Named},
     widget::{center, center_x, column, container, row, space, stack, svg, text},
 };
@@ -28,6 +29,10 @@ const CORNER_PADDING: f32 = 16.0;
 /// Max width of the typing area. Lines wrap to fit it.
 const TEXT_WIDTH: f32 = 820.0;
 const VISIBLE_LINES: usize = 3;
+/// How long the buttons take to fade out when typing starts, and back in on restart.
+const CONTROLS_FADE: Duration = Duration::from_millis(300);
+/// How long a button takes to light up when hovered or selected.
+const HIGHLIGHT_FADE: Duration = Duration::from_millis(150);
 
 /// Loaded once and reused, instead of on every redraw.
 static RESTART_ICON: LazyLock<svg::Handle> = LazyLock::new(|| {
@@ -150,30 +155,62 @@ impl Round {
     }
 }
 
-/// Hover and keyboard selection of the restart button in the typing view.
-#[derive(Default, Clone, Copy)]
-struct RestartButton {
+/// Hover and keyboard selection of a button, with its highlight fading in and out.
+struct ButtonState {
     hovered: bool,
     selected: bool,
+    highlight: Animation<bool>,
+}
+
+impl ButtonState {
+    fn new() -> Self {
+        Self {
+            hovered: false,
+            selected: false,
+            highlight: Animation::new(false).duration(HIGHLIGHT_FADE).easing(Easing::EaseOut),
+        }
+    }
+
+    fn set_hovered(&mut self, hovered: bool, now: Instant) {
+        self.hovered = hovered;
+        self.highlight.go_mut(self.hovered || self.selected, now);
+    }
+
+    fn set_selected(&mut self, selected: bool, now: Instant) {
+        self.selected = selected;
+        self.highlight.go_mut(self.hovered || self.selected, now);
+    }
+
+    /// From 0 when plain to 1 when highlighted.
+    fn highlight(&self, now: Instant) -> f32 {
+        self.highlight.interpolate(0.0, 1.0, now)
+    }
 }
 
 pub struct State {
     round: Round,
-    restart_button: RestartButton,
-    /// The exit button can't be selected with Tab, so only its hover is tracked.
-    exit_hovered: bool,
+    /// Shown before the round starts and faded out while typing.
+    controls: Animation<bool>,
+    restart_button: ButtonState,
+    /// The exit button can't be selected with Tab, so it is only ever hovered.
+    exit_button: ButtonState,
+    /// How long the caret takes to glide, or `None` when it jumps.
+    caret_glide: Option<Duration>,
 }
 
 impl State {
-    pub fn new(duration: Duration) -> Self {
+    pub fn new(duration: Duration, caret_glide: Option<Duration>) -> Self {
         Self {
             round: Round::new(duration),
-            restart_button: RestartButton::default(),
-            exit_hovered: false,
+            controls: Animation::new(true).duration(CONTROLS_FADE).easing(Easing::EaseOut),
+            restart_button: ButtonState::new(),
+            exit_button: ButtonState::new(),
+            caret_glide,
         }
     }
 
     pub fn update(&mut self, message: Message) -> Option<Event> {
+        let now = Instant::now();
         match message {
             Message::Tick => self
                 .round
@@ -182,7 +219,8 @@ impl State {
                 .then(|| Event::Finished(self.round.score())),
             Message::Input(c) => {
                 self.round.type_char(c);
-                self.restart_button.selected = false;
+                self.controls.go_mut(false, now);
+                self.restart_button.set_selected(false, now);
                 None
             }
             Message::Backspace { word } => {
@@ -190,31 +228,31 @@ impl State {
                 None
             }
             Message::RestartHovered(hovered) => {
-                self.restart_button.hovered = hovered;
+                self.restart_button.set_hovered(hovered, now);
                 None
             }
             Message::ToggleRestartSelected => {
-                self.restart_button.selected = !self.restart_button.selected;
+                self.restart_button.set_selected(!self.restart_button.selected, now);
                 None
             }
             Message::ActivateSelected => {
                 if self.restart_button.selected {
-                    self.restart();
+                    self.restart(now);
                 }
                 None
             }
             Message::Restart => {
-                self.restart();
+                self.restart(now);
                 None
             }
             Message::ExitHovered(hovered) => {
-                self.exit_hovered = hovered;
+                self.exit_button.set_hovered(hovered, now);
                 None
             }
             Message::Exit => Some(Event::Exit),
             Message::Cancel => {
                 if self.restart_button.selected {
-                    self.restart_button.selected = false;
+                    self.restart_button.set_selected(false, now);
                     None
                 } else {
                     Some(Event::Exit)
@@ -223,7 +261,7 @@ impl State {
         }
     }
 
-    pub fn view(&self) -> Element<'_, Message> {
+    pub fn view(&self, now: Instant) -> Element<'_, Message> {
         let typing_text = TypingText::new(
             self.round.text(),
             self.round.results(),
@@ -237,7 +275,8 @@ impl State {
         .font(Font::MONOSPACE)
         .size(FONT_SIZE)
         .line_spacing(8.0)
-        .visible_lines(VISIBLE_LINES);
+        .visible_lines(VISIBLE_LINES)
+        .glide(self.caret_glide);
 
         let hint: Element<'_, Message> = if self.round.started() {
             space().into()
@@ -250,22 +289,21 @@ impl State {
             .style(text::primary);
         let header = row![hint, space::horizontal(), timer].align_y(Alignment::Center);
 
-        // Hidden mid-round so it doesn't distract, unless hovered or selected.
+        // Hidden mid-round so they don't distract, unless hovered or selected.
+        let controls = self.controls.interpolate(0.0, 1.0, now);
         let restart_button = icon_button(
             RESTART_ICON.clone(),
             ICON_SIZE,
-            !self.round.started(),
-            self.restart_button.hovered || self.restart_button.selected,
+            controls,
+            self.restart_button.highlight(now),
             Message::Restart,
             Message::RestartHovered,
         );
-
-        // Hidden mid-round like the restart button, but only revealed by hovering.
         let exit_button = icon_button(
             EXIT_ICON.clone(),
             EXIT_ICON_SIZE,
-            !self.round.started(),
-            self.exit_hovered,
+            controls,
+            self.exit_button.highlight(now),
             Message::Exit,
             Message::ExitHovered,
         );
@@ -293,11 +331,23 @@ impl State {
         Subscription::batch([tick, keyboard])
     }
 
+    /// Whether a button is still fading, so the app keeps drawing frames.
+    pub fn is_animating(&self, now: Instant) -> bool {
+        [
+            &self.controls,
+            &self.restart_button.highlight,
+            &self.exit_button.highlight,
+        ]
+        .iter()
+        .any(|animation| animation.is_animating(now))
+    }
+
     /// Starts a new round of the same length, keeping the button's hover since the
     /// cursor is still over it after a click.
-    fn restart(&mut self) {
+    fn restart(&mut self, now: Instant) {
         self.round = Round::new(self.round.duration);
-        self.restart_button.selected = false;
+        self.controls.go_mut(true, now);
+        self.restart_button.set_selected(false, now);
     }
 }
 
@@ -381,12 +431,35 @@ mod tests {
 
         #[rstest]
         fn escape_clears_the_selection_before_exiting() {
-            let mut state = State::new(Duration::from_secs(15));
+            let mut state = State::new(Duration::from_secs(15), None);
             state.update(Message::ToggleRestartSelected);
 
             assert!(state.update(Message::Cancel).is_none());
             assert!(!state.restart_button.selected);
             assert!(matches!(state.update(Message::Cancel), Some(Event::Exit)));
+        }
+
+        #[rstest]
+        fn typing_hides_the_controls_and_restarting_shows_them() {
+            let mut state = State::new(Duration::from_secs(15), None);
+
+            state.update(Message::Input('a'));
+            assert!(!state.controls.value());
+
+            state.update(Message::Restart);
+            assert!(state.controls.value());
+        }
+
+        #[rstest]
+        fn controls_fade_instead_of_vanishing() {
+            let mut state = State::new(Duration::from_secs(15), None);
+            let start = Instant::now();
+
+            state.update(Message::Input('a'));
+
+            assert!(state.is_animating(start));
+            assert!(!state.is_animating(start + CONTROLS_FADE * 2));
+            assert_eq!(state.controls.interpolate(0.0, 1.0, start + CONTROLS_FADE * 2), 0.0);
         }
     }
 }

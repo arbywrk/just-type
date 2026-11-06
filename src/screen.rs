@@ -4,7 +4,8 @@ pub mod typing;
 
 pub enum Screen {
     Menu(menu::State),
-    Typing(typing::State),
+    // Boxed, since it is much bigger than the other screens.
+    Typing(Box<typing::State>),
     Results(results::State),
 }
 

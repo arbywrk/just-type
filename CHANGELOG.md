@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Persistent settings
 - Persistent score records.
 - Exit button in the upper left corner of the typing screen to go back to the menu.
+- Animations for the carrot and buttons.
 - Zoom for the whole interface with `Ctrl +` and `Ctrl -`, and `Ctrl 0` to reset it.
 - Window title.
 - The project is now licensed under GPL-3.0-or-later.

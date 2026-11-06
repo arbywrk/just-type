@@ -1,6 +1,6 @@
 //! User preferences.
 
-use std::{fs, io, path::Path};
+use std::{fs, io, path::Path, time::Duration};
 
 use serde::{Deserialize, Serialize};
 
@@ -12,6 +12,10 @@ pub struct Settings {
     pub duration: DurationChoice,
     /// Scale factor applied to the whole UI, on top of the OS one.
     pub zoom: f32,
+    /// Whether the caret glides between characters instead of jumping.
+    pub smooth_caret: bool,
+    /// How long the caret takes to glide to its next position. Lower is faster.
+    pub caret_glide_ms: u64,
 }
 
 impl Default for Settings {
@@ -19,11 +23,18 @@ impl Default for Settings {
         Self {
             duration: DurationChoice::default(),
             zoom: 1.0,
+            smooth_caret: true,
+            caret_glide_ms: 100,
         }
     }
 }
 
 impl Settings {
+    /// How long the caret takes to glide, or `None` when it jumps.
+    pub fn caret_glide(&self) -> Option<Duration> {
+        self.smooth_caret.then(|| Duration::from_millis(self.caret_glide_ms))
+    }
+
     /// Reads the settings, falling back to the defaults when the file is missing or invalid.
     pub fn load(path: &Path) -> Self {
         match fs::read_to_string(path) {
@@ -112,6 +123,23 @@ mod tests {
         }
     }
 
+    mod caret_glide {
+        use super::*;
+
+        #[rstest]
+        #[case::smooth(true, Some(Duration::from_millis(80)))]
+        #[case::jumps(false, None)]
+        fn follows_the_smooth_caret_switch(#[case] smooth_caret: bool, #[case] expected: Option<Duration>) {
+            let settings = Settings {
+                smooth_caret,
+                caret_glide_ms: 80,
+                ..Settings::default()
+            };
+
+            assert_eq!(settings.caret_glide(), expected);
+        }
+    }
+
     mod save {
         use super::*;
 
@@ -120,6 +148,8 @@ mod tests {
             let settings = Settings {
                 duration: DurationChoice::Secs60,
                 zoom: 1.2,
+                smooth_caret: false,
+                caret_glide_ms: 50,
             };
 
             settings.save(&temp_file.path).unwrap();
