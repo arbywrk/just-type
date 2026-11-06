@@ -13,11 +13,14 @@ use iced::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    database::Database,
     paths::Paths,
-    score::{Records, Score},
     screen::{Screen, menu, results, typing},
     settings::Settings,
+};
+
+use just_type_core::{
+    db::Database,
+    score::{Records, Score},
 };
 
 const ZOOM_STEP: f32 = 0.1;

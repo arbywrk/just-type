@@ -1,3 +1,7 @@
+//! Handles words generation for the tests.
+//!
+//! The words are embedded in the final binary.
+
 use std::{ops::Range, sync::LazyLock};
 
 use rand::seq::IndexedRandom;
@@ -86,9 +90,9 @@ pub fn visible_lines(lines: &[Range<usize>], cursor: usize, count: usize) -> &[R
 
 #[cfg(test)]
 mod tests {
-    use rstest::{fixture, rstest};
-
     use super::*;
+
+    use rstest::{fixture, rstest};
 
     mod helpers {
         pub fn chars(s: &str) -> Vec<char> {

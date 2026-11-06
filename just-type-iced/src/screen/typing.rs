@@ -11,10 +11,13 @@ use iced::{
 };
 
 use crate::{
-    score::{Score, compute_score},
     style::{CARET, CORRECT, MUTED, SMALL_SIZE, WRONG},
     typing_text::{self, TypingText},
     widget::icon_button,
+};
+
+use just_type_core::{
+    score::{Score, compute_score},
     words,
 };
 

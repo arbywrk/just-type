@@ -5,10 +5,11 @@ use iced::{
 };
 
 use crate::{
-    score::{Records, Score},
     style::{BODY_SIZE, MUTED, SMALL_SIZE},
     widget::focus_ring,
 };
+
+use just_type_core::score::{Records, Score};
 
 const STAT_SIZE: f32 = 56.0;
 

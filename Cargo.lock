@@ -1612,6 +1612,12 @@ dependencies = [
 [[package]]
 name = "just-type-core"
 version = "0.4.0"
+dependencies = [
+ "rand",
+ "rusqlite",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "just-type-iced"
@@ -1619,9 +1625,8 @@ version = "0.4.0"
 dependencies = [
  "directories",
  "iced",
- "rand",
+ "just-type-core",
  "rstest",
- "rusqlite",
  "serde",
  "serde_json",
  "tokio",

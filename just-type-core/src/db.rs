@@ -1,4 +1,4 @@
-//! The history of finished rounds, stored in SQLite.
+//! The database containing the user's history.
 
 use std::{
     fmt,
@@ -10,12 +10,18 @@ use rusqlite::{Connection, params};
 
 use crate::score::{Records, Score};
 
-/// How many of the latest rounds the recent average covers.
+/// How many rounds the recent average covers.
 const RECENT_ROUNDS: usize = 10;
+
 /// The `mode` of timed tests, whose `mode_value` is their length in seconds.
+///
+/// This is currently hardcoded because the database was created with future
+/// proofing for other mods in the future.
 const TIME_MODE: &str = "time";
 
-/// Applied in order. The database's `user_version` counts how many have already run.
+/// Database's migrations.
+///
+/// They are applied in order. The database's `user_version` counts how many have already run.
 const MIGRATIONS: &[&str] = &[include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/migrations/0001_create_results.sql"
@@ -23,12 +29,10 @@ const MIGRATIONS: &[&str] = &[include_str!(concat!(
 
 #[derive(Debug)]
 pub enum Error {
+    /// Used to propagate SQLite errors.
     Sqlite(rusqlite::Error),
     /// The database was created by a newer version of the app.
-    UnknownVersion {
-        found: usize,
-        supported: usize,
-    },
+    UnknownVersion { found: usize, supported: usize },
 }
 
 impl fmt::Display for Error {
@@ -37,7 +41,7 @@ impl fmt::Display for Error {
             Error::Sqlite(error) => error.fmt(f),
             Error::UnknownVersion { found, supported } => write!(
                 f,
-                "the database is at version {found}, but this version of the app only knows up to {supported}"
+                "The database is at version {found}, but this version of the app only knows up to {supported}"
             ),
         }
     }
@@ -135,11 +139,9 @@ fn migrate(connection: &mut Connection) -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
+    use super::*;
 
     use rstest::{fixture, rstest};
-
-    use super::*;
 
     #[fixture]
     fn database() -> Database {

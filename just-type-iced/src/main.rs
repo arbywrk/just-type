@@ -1,18 +1,19 @@
+//! Entry point for the iced ui game binary
+
+// prevent Windows from opening a terminal when running the app.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod database;
 mod game;
 mod paths;
-mod score;
 mod screen;
 mod settings;
 mod style;
 mod typing_text;
 mod widget;
-mod words;
 
 use crate::game::Game;
 
+/// Create, setup and run the game.
 fn main() -> iced::Result {
     iced::application(Game::new, Game::update, Game::view)
         .subscription(Game::subscription)

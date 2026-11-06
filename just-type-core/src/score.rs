@@ -1,3 +1,5 @@
+//! Responisble for tracking the [`Score`] and [`Records`].
+
 use std::time::Duration;
 
 #[derive(Clone, Copy)]
@@ -29,8 +31,8 @@ fn wpm(chars: usize, elapsed: Duration) -> f64 {
     (chars as f64 / 5.0) / minutes
 }
 
-/// `keystrokes` and `correct_keystrokes` count every key press, including ones later
-/// erased with backspace; `correct_chars` counts only correct chars left in the text.
+/// `keystrokes` and `correct_keystrokes` count every key press, including ones later erased with backspace,
+/// `correct_chars` counts only correct chars left in the text.
 pub fn compute_score(keystrokes: usize, correct_keystrokes: usize, correct_chars: usize, elapsed: Duration) -> Score {
     let raw_wpm = wpm(keystrokes, elapsed);
     let net_wpm = wpm(correct_chars, elapsed);
