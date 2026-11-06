@@ -5,8 +5,7 @@
 //! - Windows: `%APPDATA%\arbywrk\JustType\config` and `%APPDATA%\arbywrk\JustType\data`
 //! - Debug builds: `data/config` and `data/data` next to the binary, e.g. `target/debug/data`.
 //!
-//! `JUST_TYPE_CONFIG_HOME` and `JUST_TYPE_DATA_HOME` override these in any build. They name
-//! the final directories, the ones `settings.json` and `history.sqlite3` go in.
+//! `JUST_TYPE_CONFIG_HOME` and `JUST_TYPE_DATA_HOME` override these in any build.
 
 use std::{
     env, fs,
@@ -21,8 +20,9 @@ pub struct Paths {
 }
 
 impl Paths {
-    /// Finds the app's directories and creates them if needed. A path is `None` when its
-    /// directory can't be found or created, and the app then runs without that file.
+    /// Finds the app's directories and creates them if needed.
+    ///
+    /// If the directory can't be found or created, the app runs without that file.
     pub fn new() -> Self {
         let config = dir("JUST_TYPE_CONFIG_HOME", "config", ProjectDirs::config_dir);
         let data = dir("JUST_TYPE_DATA_HOME", "data", ProjectDirs::data_dir);
@@ -35,7 +35,7 @@ impl Paths {
 }
 
 /// The directory `variable` names, or else this build's default: `debug_name` inside the
-/// binary's `data` directory in debug builds, and the platform's directory in release ones.
+/// binary's `data` directory in debug builds, and the platform's directory in release builds.
 fn dir(variable: &str, debug_name: &str, platform_dir: fn(&ProjectDirs) -> &Path) -> Option<PathBuf> {
     if let Some(dir) = env::var_os(variable).filter(|dir| !dir.is_empty()) {
         return Some(dir.into());

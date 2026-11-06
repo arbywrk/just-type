@@ -13,13 +13,13 @@ use iced::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    paths::Paths,
     screen::{Screen, menu, results, typing},
     settings::Settings,
 };
 
 use just_type_core::{
     db::Database,
+    paths::Paths,
     score::{Records, Score},
 };
 

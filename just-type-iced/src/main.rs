@@ -4,7 +4,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod game;
-mod paths;
 mod screen;
 mod settings;
 mod style;

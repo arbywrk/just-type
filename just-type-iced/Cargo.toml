@@ -11,12 +11,11 @@ name = "just-type"
 path = "src/main"
 
 [dependencies]
-just-type-core = { path = "../just-type-core" }
-directories = "6.0.0"
-iced = { version = "0.14.0", features = ["advanced", "tokio", "svg"] }
-tokio = { version = "1.53.2", features = ["full"] }
 serde.workspace = true
 serde_json.workspace = true
+just-type-core = { path = "../just-type-core" }
+iced = { version = "0.14.0", features = ["advanced", "tokio", "svg"] }
+tokio = { version = "1.53.2", features = ["full"] }
 
 [dev-dependencies]
 rstest = "0.28.0"

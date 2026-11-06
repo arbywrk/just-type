@@ -1613,6 +1613,7 @@ dependencies = [
 name = "just-type-core"
 version = "0.4.0"
 dependencies = [
+ "directories",
  "rand",
  "rusqlite",
  "serde",
@@ -1623,7 +1624,6 @@ dependencies = [
 name = "just-type-iced"
 version = "0.4.0"
 dependencies = [
- "directories",
  "iced",
  "just-type-core",
  "rstest",
