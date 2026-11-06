@@ -4,18 +4,14 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish = false
-default-run = "just-type-iced"
 
 [[bin]]
 name = "just-type"
-path = "src/main"
+path = "src/main.rs"
 
 [dependencies]
-serde.workspace = true
-serde_json.workspace = true
-just-type-core = { path = "../just-type-core" }
 iced = { version = "0.14.0", features = ["advanced", "tokio", "svg"] }
-tokio = { version = "1.53.2", features = ["full"] }
+just-type-core = { path = "../just-type-core" }
 
 [dev-dependencies]
-rstest = "0.28.0"
+rstest.workspace = true

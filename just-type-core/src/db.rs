@@ -156,7 +156,7 @@ mod tests {
                 raw_wpm: wpm,
                 net_wpm: wpm,
                 accuracy: 100.0,
-                duration: Duration::from_secs(secs),
+                duration: std::time::Duration::from_secs(secs),
             }
         }
 

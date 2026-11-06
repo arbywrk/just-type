@@ -34,6 +34,12 @@ impl Paths {
     }
 }
 
+impl Default for Paths {
+    fn default() -> Self {
+        Paths::new()
+    }
+}
+
 /// The directory `variable` names, or else this build's default: `debug_name` inside the
 /// binary's `data` directory in debug builds, and the platform's directory in release builds.
 fn dir(variable: &str, debug_name: &str, platform_dir: fn(&ProjectDirs) -> &Path) -> Option<PathBuf> {
