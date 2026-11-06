@@ -5,4 +5,5 @@
 pub mod db;
 pub mod paths;
 pub mod score;
+pub mod settings;
 pub mod words;

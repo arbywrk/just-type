@@ -4,10 +4,9 @@ use iced::{
     widget::{button, center, column, radio, row, text},
 };
 
-use crate::{
-    game::DurationChoice,
-    style::{BODY_SIZE, MUTED, SMALL_SIZE},
-};
+use crate::style::{BODY_SIZE, MUTED, SMALL_SIZE};
+
+use just_type_core::settings::DurationChoice;
 
 const TITLE_SIZE: f32 = 48.0;
 

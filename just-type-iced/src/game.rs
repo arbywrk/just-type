@@ -10,17 +10,14 @@ use iced::{
     widget::{container, space, stack},
     window,
 };
-use serde::{Deserialize, Serialize};
 
-use crate::{
-    screen::{Screen, menu, results, typing},
-    settings::Settings,
-};
+use crate::screen::{Screen, menu, results, typing};
 
 use just_type_core::{
     db::Database,
     paths::Paths,
     score::{Records, Score},
+    settings::Settings,
 };
 
 const ZOOM_STEP: f32 = 0.1;
@@ -39,45 +36,6 @@ pub enum Message {
     Menu(menu::Message),
     Typing(typing::Message),
     Results(results::Message),
-}
-
-#[derive(Default, Clone, Debug, Copy, Eq, PartialEq, Serialize, Deserialize)]
-pub enum DurationChoice {
-    #[default]
-    #[serde(rename = "15s")]
-    Secs15,
-    #[serde(rename = "30s")]
-    Secs30,
-    #[serde(rename = "60s")]
-    Secs60,
-}
-
-impl DurationChoice {
-    pub fn as_duration(self) -> Duration {
-        match self {
-            DurationChoice::Secs15 => Duration::from_secs(15),
-            DurationChoice::Secs30 => Duration::from_secs(30),
-            DurationChoice::Secs60 => Duration::from_secs(60),
-        }
-    }
-
-    /// The next longer choice, wrapping around to the shortest.
-    pub fn next(self) -> Self {
-        match self {
-            DurationChoice::Secs15 => DurationChoice::Secs30,
-            DurationChoice::Secs30 => DurationChoice::Secs60,
-            DurationChoice::Secs60 => DurationChoice::Secs15,
-        }
-    }
-
-    /// The next shorter choice, wrapping around to the longest.
-    pub fn previous(self) -> Self {
-        match self {
-            DurationChoice::Secs15 => DurationChoice::Secs60,
-            DurationChoice::Secs30 => DurationChoice::Secs15,
-            DurationChoice::Secs60 => DurationChoice::Secs30,
-        }
-    }
 }
 
 pub struct Game {

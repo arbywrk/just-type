@@ -4,7 +4,8 @@ pub mod typing;
 
 pub enum Screen {
     Menu(menu::State),
-    // Boxed, since it is much bigger than the other screens.
+    // Only this state is put inside a pointer because
+    // its size makes it resonable.
     Typing(Box<typing::State>),
     Results(results::State),
 }
