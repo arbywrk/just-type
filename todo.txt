@@ -1,0 +1,1 @@
+2026-11-07 Fix restart bug on the typing screen
