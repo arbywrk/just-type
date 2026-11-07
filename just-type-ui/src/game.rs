@@ -11,13 +11,15 @@ use iced::{
     window,
 };
 
-use crate::screen::{Screen, menu, results, typing};
+use crate::{
+    screen::{Screen, menu, results, typing},
+    settings::Settings,
+};
 
 use just_type_core::{
     db::Database,
     paths::Paths,
     score::{Records, Score},
-    settings::Settings,
 };
 
 const ZOOM_STEP: f32 = 0.1;
@@ -41,7 +43,7 @@ pub enum Message {
 pub struct Game {
     screen: Screen,
     settings: Settings,
-    settings_path: Option<PathBuf>,
+    settings_file_path: Option<PathBuf>,
     /// `None` when the history couldn't be opened.
     /// Rounds still work without records.
     database: Option<Database>,
@@ -55,7 +57,8 @@ impl Game {
     pub fn new() -> Self {
         let paths = Paths::new();
         let mut settings = paths.settings.as_deref().map(Settings::load).unwrap_or_default();
-        settings.zoom = settings.zoom.clamp(MIN_ZOOM, MAX_ZOOM);
+
+        settings.ui.zoom = settings.ui.zoom.clamp(MIN_ZOOM, MAX_ZOOM);
         let database = paths.database.as_deref().and_then(|path| {
             Database::open(path)
                 .inspect_err(|error| eprintln!("Couldn't open the history at {}: {error}", path.display()))
@@ -63,9 +66,9 @@ impl Game {
         });
 
         Self {
-            screen: Screen::Menu(menu::State::new(settings.duration)),
+            screen: Screen::Menu(menu::State::new(settings.game.duration)),
             settings,
-            settings_path: paths.settings,
+            settings_file_path: paths.settings,
             database,
             now: Instant::now(),
             screen_fade: Animation::new(true),
@@ -74,8 +77,8 @@ impl Game {
 
     pub fn update(&mut self, message: Message) {
         match message {
-            Message::ZoomIn => self.set_zoom(self.settings.zoom + ZOOM_STEP),
-            Message::ZoomOut => self.set_zoom(self.settings.zoom - ZOOM_STEP),
+            Message::ZoomIn => self.set_zoom(self.settings.ui.zoom + ZOOM_STEP),
+            Message::ZoomOut => self.set_zoom(self.settings.ui.zoom - ZOOM_STEP),
             Message::ZoomReset => self.set_zoom(1.0),
             Message::Frame(now) => self.now = now,
             Message::Menu(message) => {
@@ -84,7 +87,7 @@ impl Game {
                 {
                     match event {
                         menu::Event::SelectDuration(choice) => {
-                            self.settings.duration = choice;
+                            self.settings.game.duration = choice;
                             self.save_settings();
                         }
                         menu::Event::Start => self.start_round(),
@@ -136,7 +139,7 @@ impl Game {
     }
 
     pub fn scale_factor(&self) -> f32 {
-        self.settings.zoom
+        self.settings.ui.zoom
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
@@ -177,12 +180,12 @@ impl Game {
     }
 
     fn set_zoom(&mut self, zoom: f32) {
-        self.settings.zoom = zoom.clamp(MIN_ZOOM, MAX_ZOOM);
+        self.settings.ui.zoom = zoom.clamp(MIN_ZOOM, MAX_ZOOM);
         self.save_settings();
     }
 
     fn save_settings(&self) {
-        if let Some(path) = &self.settings_path
+        if let Some(path) = &self.settings_file_path
             && let Err(error) = self.settings.save(path)
         {
             eprintln!("Couldn't save the settings to {}: {error}", path.display());
@@ -213,13 +216,13 @@ impl Game {
     }
 
     fn show_menu(&mut self) {
-        self.show(Screen::Menu(menu::State::new(self.settings.duration)));
+        self.show(Screen::Menu(menu::State::new(self.settings.game.duration)));
     }
 
     fn start_round(&mut self) {
         self.show(Screen::Typing(Box::new(typing::State::new(
-            self.settings.duration.as_duration(),
-            self.settings.caret_glide(),
+            self.settings.game.duration.as_duration(),
+            self.settings.ui.caret_glide(),
         ))));
     }
 }

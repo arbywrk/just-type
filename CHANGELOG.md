@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking:** The settings file is now split into a `game` and a `ui` section. Settings from 0.4.0 are not carried over,
+  they will reset to default after updating.
+
 ## [0.4.0] - 2026-11-06
 
 ### Added
@@ -12,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Persistent settings
 - Persistent score records.
 - Exit button in the upper left corner of the typing screen to go back to the menu.
-- Animations for the carrot and buttons.
+- Animations for the caret and buttons.
 - Zoom for the whole interface with `Ctrl +` and `Ctrl -`, and `Ctrl 0` to reset it.
 - Window title.
 - The project is now licensed under GPL-3.0-or-later.
