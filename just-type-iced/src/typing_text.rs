@@ -18,9 +18,7 @@ use iced::{
     window,
 };
 
-use crate::screen::typing::InputResult;
-
-use just_type_core::words;
+use just_type_core::{score::InputResult, words};
 
 const CARET_WIDTH: f32 = 2.0;
 

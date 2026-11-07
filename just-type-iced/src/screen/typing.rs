@@ -16,12 +16,8 @@ use crate::{
     widget::icon_button,
 };
 
-use just_type_core::{
-    score::{Score, compute_score},
-    words,
-};
+use just_type_core::score::{Round, Score};
 
-const TEXT_BUFFER: usize = 200;
 /// The typing text and timer.
 const FONT_SIZE: f32 = 28.0;
 const ICON_SIZE: f32 = FONT_SIZE;
@@ -72,90 +68,6 @@ pub enum Message {
 pub enum Event {
     Finished(Score),
     Exit,
-}
-
-#[derive(Clone, Copy, Eq, PartialEq)]
-pub enum InputResult {
-    Correct,
-    Wrong,
-}
-
-impl From<bool> for InputResult {
-    fn from(correct: bool) -> Self {
-        if correct { Self::Correct } else { Self::Wrong }
-    }
-}
-
-struct Round {
-    text: Vec<char>,
-    results: Vec<InputResult>,
-    start_time: Option<Instant>,
-    /// Copied from the settings when the round starts, so changing them can't affect it.
-    duration: Duration,
-    keystrokes: usize,
-    correct_keystrokes: usize,
-}
-
-impl Round {
-    fn new(duration: Duration) -> Self {
-        let mut text = vec![];
-        words::extend_text(&mut text, TEXT_BUFFER);
-
-        Self {
-            text,
-            results: vec![],
-            start_time: None,
-            duration,
-            keystrokes: 0,
-            correct_keystrokes: 0,
-        }
-    }
-
-    fn text(&self) -> &[char] {
-        &self.text
-    }
-
-    fn results(&self) -> &[InputResult] {
-        &self.results
-    }
-
-    fn started(&self) -> bool {
-        self.start_time.is_some()
-    }
-
-    fn type_char(&mut self, c: char) {
-        self.start_time.get_or_insert_with(Instant::now);
-        if let Some(&expected) = self.text.get(self.results.len()) {
-            let correct = c == expected;
-            self.keystrokes += 1;
-            self.correct_keystrokes += usize::from(correct);
-            self.results.push(correct.into());
-        }
-        words::extend_text(&mut self.text, self.results.len() + TEXT_BUFFER);
-    }
-
-    /// Deletes the last typed character.
-    /// If `word` is true, it deletes everything back to the previous space.
-    fn backspace(&mut self, word: bool) {
-        self.results.pop();
-        if word {
-            while !self.results.is_empty() && self.text[self.results.len() - 1] != ' ' {
-                self.results.pop();
-            }
-        }
-    }
-
-    /// The full duration until the first keystroke, then counts down to zero.
-    fn remaining(&self) -> Duration {
-        self.start_time
-            .map_or(self.duration, |start| self.duration.saturating_sub(start.elapsed()))
-    }
-
-    fn score(&self) -> Score {
-        let correct_chars = self.results.iter().filter(|&&r| r == InputResult::Correct).count();
-
-        compute_score(self.keystrokes, self.correct_keystrokes, correct_chars, self.duration)
-    }
 }
 
 /// Hover and keyboard selection of a button, with its highlight fading in and out.
