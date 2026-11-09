@@ -200,6 +200,9 @@ impl<P: Paragraph<Font = Font>> State<P> {
         if self.text == widget.text {
             return;
         }
+        if !widget.text.starts_with(&self.text) {
+            self.visible.clear();
+        }
 
         let word_widths = &mut self.word_widths;
         self.lines = words::wrap_lines(widget.text, self.max_width, |word| {
