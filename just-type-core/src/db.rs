@@ -29,10 +29,12 @@ const MIGRATIONS: &[&str] = &[include_str!(concat!(
 
 #[derive(Debug)]
 pub enum Error {
-    /// Used to propagate SQLite errors.
     Sqlite(rusqlite::Error),
     /// The database was created by a newer version of the app.
-    UnknownVersion { found: usize, supported: usize },
+    UnknownVersion {
+        found: usize,
+        supported: usize,
+    },
 }
 
 impl fmt::Display for Error {
