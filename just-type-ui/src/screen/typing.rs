@@ -7,11 +7,11 @@ use iced::{
     Alignment, Animation, Element, Font, Subscription,
     animation::Easing,
     keyboard::{self, Key, key::Named},
-    widget::{center, center_x, column, container, row, space, stack, svg, text},
+    widget::{center, center_x, column, container, row, stack, svg, text},
 };
 
 use crate::{
-    style::{CARET, CORRECT, MUTED, SMALL_SIZE, WRONG},
+    style::{CARET, CORRECT, MUTED, WRONG},
     typing_text::{self, TypingText},
     widget::icon_button,
 };

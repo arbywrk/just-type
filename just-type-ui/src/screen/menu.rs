@@ -4,7 +4,7 @@ use iced::{
     widget::{button, center, column, radio, row, text},
 };
 
-use crate::style::{BODY_SIZE, MUTED, SMALL_SIZE};
+use crate::style::BODY_SIZE;
 
 use just_type_core::settings::DurationChoice;
 
