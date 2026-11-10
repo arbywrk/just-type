@@ -10,7 +10,7 @@ use iced::{
 
 use crate::screen::{Screen, menu, results, typing};
 
-use just_type_core::{paths::Paths, session::Session};
+use just_type_core::{paths::GamePaths, session::Session};
 
 const ZOOM_STEP: f32 = 0.1;
 /// How long the menu and results take to fade in.
@@ -39,7 +39,7 @@ pub struct Game {
 
 impl Game {
     pub fn new() -> Self {
-        let session = Session::open(Paths::new());
+        let session = Session::open(GamePaths::locate_or_create());
 
         Self {
             screen: Screen::Menu(menu::State::new(session.settings().gameplay.duration)),

@@ -2,7 +2,7 @@ use std::{path::PathBuf, time::SystemTime};
 
 use crate::{
     db::Database,
-    paths::Paths,
+    paths::GamePaths,
     score::{Records, Score},
     settings::Settings,
 };
@@ -17,7 +17,7 @@ pub struct Session {
 
 impl Session {
     /// Loads the settings and opens the history, using the defaults for whatever is missing.
-    pub fn open(paths: Paths) -> Self {
+    pub fn open(paths: GamePaths) -> Self {
         let settings = paths.settings.as_deref().map(Settings::load).unwrap_or_default();
         let history = paths.database.as_deref().and_then(|path| {
             Database::open(path)

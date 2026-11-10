@@ -14,16 +14,16 @@ use std::{
 
 use directories::ProjectDirs;
 
-pub struct Paths {
+pub struct GamePaths {
     pub settings: Option<PathBuf>,
     pub database: Option<PathBuf>,
 }
 
-impl Paths {
+impl GamePaths {
     /// Finds the app's directories and creates them if needed.
     ///
     /// If the directory can't be found or created, the app runs without that file.
-    pub fn new() -> Self {
+    pub fn locate_or_create() -> Self {
         let config = dir("JUST_TYPE_CONFIG_HOME", "config", ProjectDirs::config_dir);
         let data = dir("JUST_TYPE_DATA_HOME", "data", ProjectDirs::data_dir);
 
@@ -31,12 +31,6 @@ impl Paths {
             settings: config.and_then(create).map(|dir| dir.join("settings.json")),
             database: data.and_then(create).map(|dir| dir.join("history.sqlite3")),
         }
-    }
-}
-
-impl Default for Paths {
-    fn default() -> Self {
-        Paths::new()
     }
 }
 
