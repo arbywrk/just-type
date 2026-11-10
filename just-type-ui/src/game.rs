@@ -10,7 +10,7 @@ use iced::{
 
 use crate::screen::{Screen, menu, results, typing};
 
-use just_type_core::{paths::GamePaths, session::Session};
+use just_type_core::{paths::GamePaths, session::Session, settings::Appearance};
 
 const ZOOM_STEP: f32 = 0.1;
 /// How long the menu and results take to fade in.
@@ -57,7 +57,9 @@ impl Game {
             Message::ZoomOut => self
                 .session
                 .change_settings(|settings| settings.appearance.zoom -= ZOOM_STEP),
-            Message::ZoomReset => self.session.change_settings(|settings| settings.appearance.zoom = 1.0),
+            Message::ZoomReset => self
+                .session
+                .change_settings(|settings| settings.appearance.zoom = Appearance::default().zoom),
             Message::Frame(now) => self.now = now,
             Message::Menu(message) => {
                 if let Screen::Menu(state) = &mut self.screen
