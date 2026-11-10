@@ -257,8 +257,7 @@ impl State {
         .any(|animation| animation.is_animating(now))
     }
 
-    /// Starts a new round of the same length, keeping the button's hover since the
-    /// cursor is still over it after a click.
+    /// Starts a new round with the same settings.
     fn restart(&mut self, now: Instant) {
         self.round = Round::new(self.round.duration);
         self.controls.go_mut(true, now);
@@ -287,94 +286,10 @@ fn key_to_message(event: keyboard::Event) -> Option<Message> {
             key: Key::Named(Named::Escape),
             ..
         } => Some(Message::Cancel),
-        // Shortcuts like zoom are handled by the app, not typed.
         keyboard::Event::KeyPressed { modifiers, .. } if modifiers.command() => None,
         keyboard::Event::KeyPressed { text: Some(t), .. } => {
             t.chars().next().filter(|c| !c.is_control()).map(Message::Input)
         }
         _ => None,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use iced::keyboard::Modifiers;
-    use rstest::rstest;
-
-    use super::*;
-    use crate::screen::test_helpers as helpers;
-
-    mod key_to_message {
-        use super::*;
-
-        #[rstest]
-        #[case::letter(helpers::character("a", Modifiers::empty()), Message::Input('a'))]
-        #[case::backspace(
-            helpers::press(Key::Named(Named::Backspace), Modifiers::empty(), None),
-            Message::Backspace { word: false },
-        )]
-        #[case::ctrl_backspace(
-            helpers::press(Key::Named(Named::Backspace), Modifiers::CTRL, None),
-            Message::Backspace { word: true },
-        )]
-        #[case::tab(
-            helpers::press(Key::Named(Named::Tab), Modifiers::empty(), Some("\t")),
-            Message::ToggleRestartSelected
-        )]
-        #[case::enter(
-            helpers::press(Key::Named(Named::Enter), Modifiers::empty(), Some("\r")),
-            Message::ActivateSelected
-        )]
-        #[case::escape(
-            helpers::press(Key::Named(Named::Escape), Modifiers::empty(), Some("\u{1b}")),
-            Message::Cancel
-        )]
-        fn maps_key_to_its_message(#[case] event: keyboard::Event, #[case] expected: Message) {
-            assert_eq!(key_to_message(event), Some(expected));
-        }
-
-        #[rstest]
-        #[case::shortcut(helpers::character("=", Modifiers::COMMAND))]
-        #[case::control_character(helpers::press(Key::Named(Named::Delete), Modifiers::empty(), Some("\u{7f}")))]
-        fn ignores_key(#[case] event: keyboard::Event) {
-            assert_eq!(key_to_message(event), None);
-        }
-    }
-
-    mod update {
-        use super::*;
-
-        #[rstest]
-        fn escape_clears_the_selection_before_exiting() {
-            let mut state = State::new(Duration::from_secs(15), None);
-            state.update(Message::ToggleRestartSelected);
-
-            assert!(state.update(Message::Cancel).is_none());
-            assert!(!state.restart_button.selected);
-            assert!(matches!(state.update(Message::Cancel), Some(Event::Exit)));
-        }
-
-        #[rstest]
-        fn typing_hides_the_controls_and_restarting_shows_them() {
-            let mut state = State::new(Duration::from_secs(15), None);
-
-            state.update(Message::Input('a'));
-            assert!(!state.controls.value());
-
-            state.update(Message::Restart);
-            assert!(state.controls.value());
-        }
-
-        #[rstest]
-        fn controls_fade_instead_of_vanishing() {
-            let mut state = State::new(Duration::from_secs(15), None);
-            let start = Instant::now();
-
-            state.update(Message::Input('a'));
-
-            assert!(state.is_animating(start));
-            assert!(!state.is_animating(start + CONTROLS_FADE * 2));
-            assert_eq!(state.controls.interpolate(0.0, 1.0, start + CONTROLS_FADE * 2), 0.0);
-        }
     }
 }

@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Breaking:** The settings file is now split into a `game` and a `ui` section. Settings from 0.4.0 are not carried over,
+- **Breaking:** The settings file is now split into a `gameplay` and an `appearance` section. Settings from 0.4.0 are not carried over,
   they will reset to default after updating.
 
 ## [0.4.0] - 2026-11-06

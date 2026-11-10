@@ -1,7 +1,4 @@
-use std::{
-    path::PathBuf,
-    time::{Duration, Instant, SystemTime},
-};
+use std::time::{Duration, Instant, SystemTime};
 
 use iced::{
     Animation, Element, Length, Subscription, Theme,
@@ -11,20 +8,11 @@ use iced::{
     window,
 };
 
-use crate::{
-    screen::{Screen, menu, results, typing},
-    settings::Settings,
-};
+use crate::screen::{Screen, menu, results, typing};
 
-use just_type_core::{
-    db::Database,
-    paths::Paths,
-    score::{Records, Score},
-};
+use just_type_core::{paths::Paths, session::Session};
 
 const ZOOM_STEP: f32 = 0.1;
-const MIN_ZOOM: f32 = 0.5;
-const MAX_ZOOM: f32 = 2.0;
 /// How long the menu and results take to fade in.
 const SCREEN_FADE: Duration = Duration::from_millis(200);
 
@@ -42,11 +30,7 @@ pub enum Message {
 
 pub struct Game {
     screen: Screen,
-    settings: Settings,
-    settings_file_path: Option<PathBuf>,
-    /// `None` when the history couldn't be opened.
-    /// Rounds still work without records.
-    database: Option<Database>,
+    session: Session,
     /// When the current frame is drawn. Only kept up to date while something is animating.
     now: Instant,
     /// The current screen fading in. Done when `true`.
@@ -55,21 +39,11 @@ pub struct Game {
 
 impl Game {
     pub fn new() -> Self {
-        let paths = Paths::new();
-        let mut settings = paths.settings.as_deref().map(Settings::load).unwrap_or_default();
-
-        settings.ui.zoom = settings.ui.zoom.clamp(MIN_ZOOM, MAX_ZOOM);
-        let database = paths.database.as_deref().and_then(|path| {
-            Database::open(path)
-                .inspect_err(|error| eprintln!("Couldn't open the history at {}: {error}", path.display()))
-                .ok()
-        });
+        let session = Session::open(Paths::new());
 
         Self {
-            screen: Screen::Menu(menu::State::new(settings.game.duration)),
-            settings,
-            settings_file_path: paths.settings,
-            database,
+            screen: Screen::Menu(menu::State::new(session.settings().gameplay.duration)),
+            session,
             now: Instant::now(),
             screen_fade: Animation::new(true),
         }
@@ -77,9 +51,13 @@ impl Game {
 
     pub fn update(&mut self, message: Message) {
         match message {
-            Message::ZoomIn => self.set_zoom(self.settings.ui.zoom + ZOOM_STEP),
-            Message::ZoomOut => self.set_zoom(self.settings.ui.zoom - ZOOM_STEP),
-            Message::ZoomReset => self.set_zoom(1.0),
+            Message::ZoomIn => self
+                .session
+                .change_settings(|settings| settings.appearance.zoom += ZOOM_STEP),
+            Message::ZoomOut => self
+                .session
+                .change_settings(|settings| settings.appearance.zoom -= ZOOM_STEP),
+            Message::ZoomReset => self.session.change_settings(|settings| settings.appearance.zoom = 1.0),
             Message::Frame(now) => self.now = now,
             Message::Menu(message) => {
                 if let Screen::Menu(state) = &mut self.screen
@@ -87,8 +65,8 @@ impl Game {
                 {
                     match event {
                         menu::Event::SelectDuration(choice) => {
-                            self.settings.game.duration = choice;
-                            self.save_settings();
+                            self.session
+                                .change_settings(|settings| settings.gameplay.duration = choice);
                         }
                         menu::Event::Start => self.start_round(),
                     }
@@ -100,7 +78,7 @@ impl Game {
                 {
                     match event {
                         typing::Event::Finished(score) => {
-                            let records = self.record(&score);
+                            let records = self.session.record(&score, SystemTime::now());
                             self.show(Screen::Results(results::State::new(score, records)));
                         }
                         typing::Event::Exit => self.show_menu(),
@@ -139,7 +117,7 @@ impl Game {
     }
 
     pub fn scale_factor(&self) -> f32 {
-        self.settings.ui.zoom
+        self.session.settings().appearance.zoom
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
@@ -179,28 +157,6 @@ impl Game {
             || matches!(&self.screen, Screen::Typing(state) if state.is_animating(self.now))
     }
 
-    fn set_zoom(&mut self, zoom: f32) {
-        self.settings.ui.zoom = zoom.clamp(MIN_ZOOM, MAX_ZOOM);
-        self.save_settings();
-    }
-
-    fn save_settings(&self) {
-        if let Some(path) = &self.settings_file_path
-            && let Err(error) = self.settings.save(path)
-        {
-            eprintln!("Couldn't save the settings to {}: {error}", path.display());
-        }
-    }
-
-    /// Saves the round to the history. `None` when there is no history to compare with.
-    fn record(&mut self, score: &Score) -> Option<Records> {
-        self.database
-            .as_mut()?
-            .record(score, SystemTime::now())
-            .inspect_err(|error| eprintln!("Couldn't save the result: {error}"))
-            .ok()
-    }
-
     /// Switches to `screen`. The menu and results fade in, while a round shows up at
     /// once so typing can start right away.
     fn show(&mut self, screen: Screen) {
@@ -216,13 +172,16 @@ impl Game {
     }
 
     fn show_menu(&mut self) {
-        self.show(Screen::Menu(menu::State::new(self.settings.game.duration)));
+        self.show(Screen::Menu(menu::State::new(
+            self.session.settings().gameplay.duration,
+        )));
     }
 
     fn start_round(&mut self) {
+        let settings = self.session.settings();
         self.show(Screen::Typing(Box::new(typing::State::new(
-            self.settings.game.duration.as_duration(),
-            self.settings.ui.caret_glide(),
+            settings.gameplay.duration.as_duration(),
+            settings.appearance.caret_glide(),
         ))));
     }
 }

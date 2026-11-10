@@ -5,7 +5,6 @@
 
 mod game;
 mod screen;
-mod settings;
 mod style;
 mod typing_text;
 mod widget;

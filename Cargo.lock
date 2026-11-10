@@ -1628,8 +1628,6 @@ dependencies = [
  "iced",
  "just-type-core",
  "rstest",
- "serde",
- "serde_json",
 ]
 
 [[package]]
