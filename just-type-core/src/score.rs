@@ -65,19 +65,37 @@ impl Round {
     }
 
     pub fn type_char(&mut self, c: char) {
-        self.start_time.get_or_insert_with(Instant::now);
+        _ = self.start_time.get_or_insert_with(Instant::now);
+
+        // Prevent input after time has ended.
+        // Because the round may end after time runs out
+        // it would still be possible to give input although the
+        // remaining time is 0. This guard prevents that.
+        if self.remaining().is_zero() {
+            return;
+        }
+
         if let Some(&expected) = self.text.get(self.results.len()) {
             let correct = c == expected;
             self.keystrokes += 1;
             self.correct_keystrokes += usize::from(correct);
             self.results.push(correct.into());
         }
+
         words::extend_text(&mut self.text, self.results.len() + TEXT_BUFFER);
     }
 
     /// Deletes the last typed character.
     /// If `word` is true, it deletes everything back to the previous space.
     pub fn backspace(&mut self, word: bool) {
+        // Prevent backspace after time has ended.
+        // Because the round may end after time runs out
+        // it would still be possible to give input although the
+        // remaining time is 0. This guard prevents that.
+        if self.remaining().is_zero() {
+            return;
+        }
+
         self.results.pop();
         if word {
             while !self.results.is_empty() && self.text[self.results.len() - 1] != ' ' {

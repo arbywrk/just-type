@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Input after round timer reached zero is now ignored.
+
 ### Changed
 
 - **Breaking:** The settings file is now split into a `gameplay` and an `appearance` section. Settings from 0.4.0 are not carried over,
