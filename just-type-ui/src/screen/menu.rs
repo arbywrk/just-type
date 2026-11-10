@@ -61,12 +61,9 @@ impl State {
 
         center(
             column![
-                column![
-                    text("just-type").size(TITLE_SIZE).font(Font::MONOSPACE),
-                    text("Set the time, then start typing.").size(SMALL_SIZE).color(MUTED),
-                ]
-                .spacing(8)
-                .align_x(Alignment::Center),
+                column![text("just-type").size(TITLE_SIZE).font(Font::MONOSPACE),]
+                    .spacing(8)
+                    .align_x(Alignment::Center),
                 time_options,
                 start,
             ]

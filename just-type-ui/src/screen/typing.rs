@@ -193,18 +193,13 @@ impl State {
         .visible_lines(VISIBLE_LINES)
         .glide(self.caret_glide);
 
-        let hint: Element<'_, Message> = if self.round.started() {
-            space().into()
-        } else {
-            text("start typing to begin").size(SMALL_SIZE).color(MUTED).into()
-        };
         let timer = text(self.round.remaining().as_secs_f64().ceil().to_string())
             .size(FONT_SIZE)
             .font(Font::MONOSPACE)
             .style(text::primary);
-        let header = row![hint, space::horizontal(), timer].align_y(Alignment::Center);
+        let header = row![timer].align_y(Alignment::Center);
 
-        // Hidden mid-round so they don't distract, unless hovered or selected.
+        // Hidden during the round so they don't distract, unless hovered or selected.
         let controls = self.controls.interpolate(0.0, 1.0, now);
         let restart_button = icon_button(
             RESTART_ICON.clone(),
