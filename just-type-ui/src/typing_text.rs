@@ -266,15 +266,13 @@ impl<P: Paragraph<Font = Font>> State<P> {
             .map_or(0.0, |position| position.x);
         let line_start = line.range.start;
 
-        match widget.glide {
-            Some(_) if !self.snap_caret && line_start == self.caret_line => {
-                self.caret_x.go_mut(x, Instant::now());
-            }
-            _ => {
-                self.caret_x = Animation::new(x)
-                    .duration(widget.glide.unwrap_or_default())
-                    .easing(Easing::EaseOut);
-            }
+        let glide = widget.glide.is_some() && !self.snap_caret && line_start == self.caret_line;
+        if glide {
+            self.caret_x.go_mut(x, Instant::now());
+        } else {
+            self.caret_x = Animation::new(x)
+                .duration(widget.glide.unwrap_or_default())
+                .easing(Easing::EaseOut);
         }
         self.caret_y = row as f32 * (widget.line_height() + widget.line_spacing);
         self.caret_line = line_start;
