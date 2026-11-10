@@ -1,2 +1,3 @@
 x 2026-11-10 2026-11-07 Fix restart bug on the typing screen
 2026-11-10 Replace cosmic icons with gnome ones
+2026-11-11 Add a capslock warning on the typing screen
