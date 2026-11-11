@@ -17,5 +17,6 @@ fn main() -> iced::Result {
         .subscription(Game::subscription)
         .scale_factor(Game::scale_factor)
         .title("Just Type")
+        .font(style::MONO_BYTES)
         .run()
 }

@@ -4,14 +4,14 @@ use std::{
 };
 
 use iced::{
-    Alignment, Animation, Element, Font, Subscription,
+    Alignment, Animation, Element, Subscription,
     animation::Easing,
     keyboard::{self, Key, key::Named},
     widget::{center, center_x, column, container, row, stack, svg, text},
 };
 
 use crate::{
-    style::{CARET, CORRECT, MUTED, WRONG},
+    style::{self, CARET, CORRECT, MUTED, WRONG},
     typing_text::{self, TypingText},
     widget::icon_button,
 };
@@ -20,9 +20,8 @@ use just_type_core::score::{Round, Score};
 
 /// The typing text and timer.
 const FONT_SIZE: f32 = 28.0;
+/// Same size as the text, so the icons' strokes are as thick as the font's.
 const ICON_SIZE: f32 = FONT_SIZE;
-/// Smaller than the restart button, since leaving is a secondary action.
-const EXIT_ICON_SIZE: f32 = ICON_SIZE * 0.75;
 /// Distance of the exit button from the window's corner.
 const CORNER_PADDING: f32 = 16.0;
 /// Max width of the typing area. Lines wrap to fit it.
@@ -37,13 +36,13 @@ const HIGHLIGHT_FADE: Duration = Duration::from_millis(150);
 static RESTART_ICON: LazyLock<svg::Handle> = LazyLock::new(|| {
     svg::Handle::from_memory(include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/resources/icons/view-refresh-symbolic.svg"
+        "/resources/icons/arrow-clockwise-bold.svg"
     )))
 });
 static EXIT_ICON: LazyLock<svg::Handle> = LazyLock::new(|| {
     svg::Handle::from_memory(include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/resources/icons/go-previous-symbolic.svg"
+        "/resources/icons/arrow-left-bold.svg"
     )))
 });
 
@@ -187,7 +186,7 @@ impl State {
                 caret: CARET,
             },
         )
-        .font(Font::MONOSPACE)
+        .font(style::MONO)
         .size(FONT_SIZE)
         .line_spacing(8.0)
         .visible_lines(VISIBLE_LINES)
@@ -195,7 +194,7 @@ impl State {
 
         let timer = text(self.round.remaining().as_secs_f64().ceil().to_string())
             .size(FONT_SIZE)
-            .font(Font::MONOSPACE)
+            .font(style::MONO)
             .style(text::primary);
         let header = row![timer].align_y(Alignment::Center);
 
@@ -211,7 +210,7 @@ impl State {
         );
         let exit_button = icon_button(
             EXIT_ICON.clone(),
-            EXIT_ICON_SIZE,
+            ICON_SIZE,
             controls,
             self.exit_button.highlight(now),
             Message::Exit,

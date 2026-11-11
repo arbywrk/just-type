@@ -1,10 +1,10 @@
 use iced::{
-    Alignment, Element, Font, Subscription,
+    Alignment, Element, Subscription,
     keyboard::{self, Key, key::Named},
     widget::{button, center, column, radio, row, text},
 };
 
-use crate::style::BODY_SIZE;
+use crate::style::{self, BODY_SIZE};
 
 use just_type_core::settings::DurationChoice;
 
@@ -61,7 +61,7 @@ impl State {
 
         center(
             column![
-                column![text("just-type").size(TITLE_SIZE).font(Font::MONOSPACE),]
+                column![text("just-type").size(TITLE_SIZE).font(style::MONO),]
                     .spacing(8)
                     .align_x(Alignment::Center),
                 time_options,

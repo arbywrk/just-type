@@ -1,11 +1,11 @@
 use iced::{
-    Alignment, Element, Font, Subscription,
+    Alignment, Element, Subscription,
     keyboard::{self, Key, key::Named},
     widget::{button, center, column, row, text},
 };
 
 use crate::{
-    style::{BODY_SIZE, MUTED, SMALL_SIZE},
+    style::{self, BODY_SIZE, MUTED, SMALL_SIZE},
     widget::focus_ring,
 };
 
@@ -84,7 +84,7 @@ impl State {
         let stat = |label, value: String| {
             column![
                 text(label).size(SMALL_SIZE).color(MUTED),
-                text(value).size(STAT_SIZE).font(Font::MONOSPACE),
+                text(value).size(STAT_SIZE).font(style::MONO),
             ]
             .spacing(4)
             .align_x(Alignment::Center)

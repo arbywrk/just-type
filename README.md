@@ -43,5 +43,8 @@ Inspired by [Monkeytype](https://github.com/monkeytypegame/monkeytype), which sh
 and its minimal style. The English word list (`resources/languages/english.json`) comes from Monkeytype,
 licensed under [GPL-3.0](https://github.com/monkeytypegame/monkeytype/blob/master/LICENSE).
 
-Icons are from [Cosmic Icons](https://github.com/pop-os/cosmic-icons) by [System76](https://system76.com/),
-licensed under [CC-BY-SA-4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+Icons are from [Phosphor Icons](https://github.com/phosphor-icons/core), licensed under
+[MIT](https://github.com/phosphor-icons/core/blob/main/LICENSE).
+
+The font is [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono), licensed under
+[OFL-1.1](https://github.com/JetBrains/JetBrainsMono/blob/master/OFL.txt).
