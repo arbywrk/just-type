@@ -5,7 +5,8 @@ use iced::{
 };
 
 use crate::{
-    style::{self, BODY_SIZE, MUTED, SMALL_SIZE},
+    style::{self, BODY_SIZE, SMALL_SIZE},
+    theme::Palette,
     widget::focus_ring,
 };
 
@@ -80,10 +81,10 @@ impl State {
         }
     }
 
-    pub fn view(&self) -> Element<'_, Message> {
+    pub fn view(&self, palette: Palette) -> Element<'_, Message> {
         let stat = |label, value: String| {
             column![
-                text(label).size(SMALL_SIZE).color(MUTED),
+                text(label).size(SMALL_SIZE).color(palette.muted),
                 text(value).size(STAT_SIZE).font(style::MONO),
             ]
             .spacing(4)
@@ -98,7 +99,7 @@ impl State {
 
         let test_info = text(format!("{}s test", self.score.duration.as_secs()))
             .size(SMALL_SIZE)
-            .color(MUTED);
+            .color(palette.muted);
         let new_best = self
             .records
             .filter(|records| records.new_personal_best)
@@ -109,7 +110,7 @@ impl State {
                 records.personal_best, records.recent_count, records.recent_average
             ))
             .size(SMALL_SIZE)
-            .color(MUTED)
+            .color(palette.muted)
         });
 
         let restart = button(text("Restart").size(BODY_SIZE))

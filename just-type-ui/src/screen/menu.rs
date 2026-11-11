@@ -61,7 +61,7 @@ impl State {
 
         center(
             column![
-                column![text("just-type").size(TITLE_SIZE).font(style::MONO),]
+                column![text("Just Type").size(TITLE_SIZE).font(style::MONO),]
                     .spacing(8)
                     .align_x(Alignment::Center),
                 time_options,

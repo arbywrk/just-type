@@ -4,6 +4,10 @@
 //! - [`Gameplay`] -> settings that affect the gameplay
 //! - [`Appearance`] -> visual settings.
 
+pub mod theme;
+
+use theme::Theme;
+
 use std::{fs, io, path::Path, time::Duration};
 
 use serde::{Deserialize, Serialize};
@@ -101,8 +105,10 @@ pub struct Appearance {
     pub zoom: f32,
     /// Whether the caret glides between characters instead of jumping.
     pub smooth_caret: bool,
-    /// How long the caret takes to glide to its next position. Lower is faster.
+    /// How long the caret takes to glide to its next position.
     pub caret_glide_ms: u64,
+    /// Selected theme
+    pub theme: Theme,
 }
 
 impl Appearance {
@@ -121,6 +127,7 @@ impl Default for Appearance {
             zoom: 1.0,
             smooth_caret: true,
             caret_glide_ms: 100,
+            theme: Theme::default(),
         }
     }
 }

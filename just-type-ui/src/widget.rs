@@ -5,8 +5,6 @@ use iced::{
     widget::{button, container, mouse_area, svg},
 };
 
-use crate::style::MUTED;
-
 /// Space between the icon and the button's border, which also enlarges the hitbox.
 const ICON_PADDING: f32 = 8.0;
 const CORNER_RADIUS: f32 = 8.0;
@@ -28,9 +26,10 @@ pub fn icon_button<'a, Message: Clone + 'a>(
     highlight: f32,
     on_press: Message,
     on_hover: impl Fn(bool) -> Message,
+    muted: Color,
 ) -> Element<'a, Message> {
     let opacity = visibility.max(highlight);
-    let color = move |theme: &Theme| mix(MUTED, theme.palette().text, highlight);
+    let color = move |theme: &Theme| mix(muted, theme.palette().text, highlight);
 
     let icon = svg(icon)
         .width(size)

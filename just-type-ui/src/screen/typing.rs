@@ -11,7 +11,8 @@ use iced::{
 };
 
 use crate::{
-    style::{self, CARET, CORRECT, MUTED, WRONG},
+    style,
+    theme::Palette,
     typing_text::{self, TypingText},
     widget::icon_button,
 };
@@ -175,15 +176,15 @@ impl State {
         }
     }
 
-    pub fn view(&self, now: Instant) -> Element<'_, Message> {
+    pub fn view(&self, palette: Palette, now: Instant) -> Element<'_, Message> {
         let typing_text = TypingText::new(
             self.round.text(),
             self.round.results(),
             typing_text::Style {
-                pending: MUTED,
-                correct: CORRECT,
-                wrong: WRONG,
-                caret: CARET,
+                pending: palette.muted,
+                correct: palette.correct,
+                wrong: palette.wrong,
+                caret: palette.accent,
             },
         )
         .font(style::MONO)
@@ -207,6 +208,7 @@ impl State {
             self.restart_button.highlight(now),
             Message::Restart,
             Message::RestartHovered,
+            palette.muted,
         );
         let exit_button = icon_button(
             EXIT_ICON.clone(),
@@ -215,6 +217,7 @@ impl State {
             self.exit_button.highlight(now),
             Message::Exit,
             Message::ExitHovered,
+            palette.muted,
         );
 
         let content = center(

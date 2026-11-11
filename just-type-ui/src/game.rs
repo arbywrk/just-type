@@ -8,7 +8,10 @@ use iced::{
     window,
 };
 
-use crate::screen::{Screen, menu, results, typing};
+use crate::{
+    screen::{Screen, menu, results, typing},
+    theme::palette,
+};
 
 use just_type_core::{paths::GamePaths, session::Session, settings::Appearance};
 
@@ -101,10 +104,12 @@ impl Game {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
+        let palette = palette(self.session.settings().appearance.theme);
+
         let screen = match &self.screen {
             Screen::Menu(state) => state.view().map(Message::Menu),
-            Screen::Typing(state) => state.view(self.now).map(Message::Typing),
-            Screen::Results(state) => state.view().map(Message::Results),
+            Screen::Typing(state) => state.view(palette, self.now).map(Message::Typing),
+            Screen::Results(state) => state.view(palette).map(Message::Results),
         };
 
         // The screen fades in from the background. The cover is always there, even when
@@ -123,7 +128,7 @@ impl Game {
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
-        // zoom works on every screen, on top of whatever the screen listens to.
+        // Zoom works on every screen, on top of whatever the screen listens to.
         let zoom = keyboard::listen().filter_map(|event| match event {
             keyboard::Event::KeyPressed {
                 modified_key,
@@ -152,6 +157,10 @@ impl Game {
         };
 
         Subscription::batch([zoom, screen, frames])
+    }
+
+    pub fn theme(&self) -> Theme {
+        palette(self.session.settings().appearance.theme).into()
     }
 
     fn is_animating(&self) -> bool {

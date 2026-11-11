@@ -4,3 +4,4 @@ x 2026-11-11 2026-11-10 Replace cosmic icons with other ones
 2026-11-11 add settings screen
 2026-11-11 add themes
 2026-11-11 add more supported fonts
+2026-11-11 Fix resluts screen keyboard and mouse combination highlighting

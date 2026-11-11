@@ -6,6 +6,7 @@
 mod game;
 mod screen;
 mod style;
+mod theme;
 mod typing_text;
 mod widget;
 
@@ -18,5 +19,6 @@ fn main() -> iced::Result {
         .scale_factor(Game::scale_factor)
         .title("Just Type")
         .font(style::MONO_BYTES)
+        .theme(Game::theme)
         .run()
 }
