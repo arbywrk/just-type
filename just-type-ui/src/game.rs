@@ -9,7 +9,7 @@ use iced::{
 };
 
 use crate::{
-    screen::{Screen, menu, results, typing},
+    screen::{Screen, results, typing},
     theme::palette,
 };
 
@@ -26,7 +26,6 @@ pub enum Message {
     ZoomReset,
     /// A frame is about to be drawn while something is animating.
     Frame(Instant),
-    Menu(menu::Message),
     Typing(typing::Message),
     Results(results::Message),
 }
@@ -45,7 +44,10 @@ impl Game {
         let session = Session::open(GamePaths::locate_or_create());
 
         Self {
-            screen: Screen::Menu(menu::State::new(session.settings().gameplay.duration)),
+            screen: Screen::Typing(Box::new(typing::State::new(
+                session.settings().gameplay.duration,
+                session.settings().appearance.caret_glide(),
+            ))),
             session,
             now: Instant::now(),
             screen_fade: Animation::new(true),
@@ -64,19 +66,6 @@ impl Game {
                 .session
                 .change_settings(|settings| settings.appearance.zoom = Appearance::default().zoom),
             Message::Frame(now) => self.now = now,
-            Message::Menu(message) => {
-                if let Screen::Menu(state) = &mut self.screen
-                    && let Some(event) = state.update(message)
-                {
-                    match event {
-                        menu::Event::SelectDuration(choice) => {
-                            self.session
-                                .change_settings(|settings| settings.gameplay.duration = choice);
-                        }
-                        menu::Event::Start => self.start_round(),
-                    }
-                }
-            }
             Message::Typing(message) => {
                 if let Screen::Typing(state) = &mut self.screen
                     && let Some(event) = state.update(message)
@@ -86,7 +75,10 @@ impl Game {
                             let records = self.session.record(&score, SystemTime::now());
                             self.show(Screen::Results(results::State::new(score, records)));
                         }
-                        typing::Event::Exit => self.show_menu(),
+                        typing::Event::SelectDuration(choice) => {
+                            self.session
+                                .change_settings(|settings| settings.gameplay.duration = choice);
+                        }
                     }
                 }
             }
@@ -96,7 +88,6 @@ impl Game {
                 {
                     match event {
                         results::Event::Restart => self.start_round(),
-                        results::Event::BackToMenu => self.show_menu(),
                     }
                 }
             }
@@ -107,7 +98,6 @@ impl Game {
         let palette = palette(self.session.settings().appearance.theme);
 
         let screen = match &self.screen {
-            Screen::Menu(state) => state.view().map(Message::Menu),
             Screen::Typing(state) => state.view(palette, self.now).map(Message::Typing),
             Screen::Results(state) => state.view(palette).map(Message::Results),
         };
@@ -144,9 +134,8 @@ impl Game {
         });
 
         let screen = match &self.screen {
-            Screen::Menu(state) => state.subscription().map(Message::Menu),
             Screen::Typing(state) => state.subscription().map(Message::Typing),
-            Screen::Results(state) => state.subscription().map(Message::Results),
+            Screen::Results(_) => Subscription::none(),
         };
 
         // Frames are only needed while something moves, so the app is idle otherwise.
@@ -182,16 +171,10 @@ impl Game {
         self.screen = screen;
     }
 
-    fn show_menu(&mut self) {
-        self.show(Screen::Menu(menu::State::new(
-            self.session.settings().gameplay.duration,
-        )));
-    }
-
     fn start_round(&mut self) {
         let settings = self.session.settings();
         self.show(Screen::Typing(Box::new(typing::State::new(
-            settings.gameplay.duration.as_duration(),
+            settings.gameplay.duration,
             settings.appearance.caret_glide(),
         ))));
     }

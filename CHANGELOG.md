@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Consistent themeing
 
+### Removed
+
+- The main menu. Now the typing screen is the menu at the same time.
+
 ### Fixed
 
 - Input after round timer reached zero is now ignored.

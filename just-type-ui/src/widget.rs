@@ -29,7 +29,7 @@ pub fn icon_button<'a, Message: Clone + 'a>(
     muted: Color,
 ) -> Element<'a, Message> {
     let opacity = visibility.max(highlight);
-    let color = move |theme: &Theme| mix(muted, theme.palette().text, highlight);
+    let color = move |theme: &Theme| mix(muted, theme.palette().primary, highlight);
 
     let icon = svg(icon)
         .width(size)

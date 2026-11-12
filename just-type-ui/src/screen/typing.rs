@@ -4,20 +4,25 @@ use std::{
 };
 
 use iced::{
-    Alignment, Animation, Element, Subscription,
+    Alignment, Animation, Element,
+    Length::Fill,
+    Subscription,
     animation::Easing,
     keyboard::{self, Key, key::Named},
-    widget::{center, center_x, column, container, row, stack, svg, text},
+    widget::{center, center_x, column, container, opaque, radio, row, space, stack, svg, text},
 };
 
 use crate::{
-    style,
+    style::{self, BODY_SIZE},
     theme::Palette,
     typing_text::{self, TypingText},
     widget::icon_button,
 };
 
-use just_type_core::score::{Round, Score};
+use just_type_core::{
+    score::{Round, Score},
+    settings::DurationChoice,
+};
 
 /// The typing text and timer.
 const FONT_SIZE: f32 = 28.0;
@@ -40,12 +45,6 @@ static RESTART_ICON: LazyLock<svg::Handle> = LazyLock::new(|| {
         "/resources/icons/arrow-clockwise-bold.svg"
     )))
 });
-static EXIT_ICON: LazyLock<svg::Handle> = LazyLock::new(|| {
-    svg::Handle::from_memory(include_bytes!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/resources/icons/arrow-left-bold.svg"
-    )))
-});
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Message {
@@ -59,15 +58,12 @@ pub enum Message {
     /// Presses the restart button if it is selected.
     ActivateSelected,
     Restart,
-    ExitHovered(bool),
-    Exit,
-    /// Clears the restart button's selection, or exits when nothing is selected.
-    Cancel,
+    SelectDuration(DurationChoice),
 }
 
 pub enum Event {
     Finished(Score),
-    Exit,
+    SelectDuration(DurationChoice),
 }
 
 /// Hover and keyboard selection of a button, with its highlight fading in and out.
@@ -105,7 +101,8 @@ impl ButtonState {
 pub struct State {
     round: Round,
     /// Shown before the round starts and faded out while typing.
-    controls: Animation<bool>,
+    controls_visibility: Animation<bool>,
+    duration_choice: DurationChoice,
     restart_button: ButtonState,
     /// The exit button can't be selected with Tab, so it is only ever hovered.
     exit_button: ButtonState,
@@ -114,13 +111,14 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(duration: Duration, caret_glide: Option<Duration>) -> Self {
+    pub fn new(choice: DurationChoice, caret_glide: Option<Duration>) -> Self {
         Self {
-            round: Round::new(duration),
-            controls: Animation::new(true).duration(CONTROLS_FADE).easing(Easing::EaseOut),
+            round: Round::new(choice.as_duration()),
+            controls_visibility: Animation::new(true).duration(CONTROLS_FADE).easing(Easing::EaseOut),
             restart_button: ButtonState::new(),
             exit_button: ButtonState::new(),
             caret_glide,
+            duration_choice: choice,
         }
     }
 
@@ -134,7 +132,7 @@ impl State {
                 .then(|| Event::Finished(self.round.score())),
             Message::Input(c) => {
                 self.round.type_char(c);
-                self.controls.go_mut(false, now);
+                self.controls_visibility.go_mut(false, now);
                 self.restart_button.set_selected(false, now);
                 None
             }
@@ -160,20 +158,23 @@ impl State {
                 self.restart(now);
                 None
             }
-            Message::ExitHovered(hovered) => {
-                self.exit_button.set_hovered(hovered, now);
-                None
-            }
-            Message::Exit => Some(Event::Exit),
-            Message::Cancel => {
-                if self.restart_button.selected {
-                    self.restart_button.set_selected(false, now);
-                    None
-                } else {
-                    Some(Event::Exit)
+            Message::SelectDuration(choice) => {
+                if self.round.started() {
+                    return None;
                 }
+
+                self.select(choice, now)
             }
         }
+    }
+
+    fn select(&mut self, duration_choice: DurationChoice, now: Instant) -> Option<Event> {
+        if duration_choice == self.duration_choice {
+            return None;
+        }
+        self.duration_choice = duration_choice;
+        self.restart(now);
+        Some(Event::SelectDuration(duration_choice))
     }
 
     pub fn view(&self, palette: Palette, now: Instant) -> Element<'_, Message> {
@@ -193,6 +194,35 @@ impl State {
         .visible_lines(VISIBLE_LINES)
         .glide(self.caret_glide);
 
+        let visibility = self.controls_visibility.interpolate(0.0, 1.0, now);
+
+        let duration_radio = |label, choice| {
+            stack![
+                radio(label, choice, Some(self.duration_choice), Message::SelectDuration)
+                    .size(BODY_SIZE)
+                    .text_size(BODY_SIZE)
+                    .style(move |theme: &iced::Theme, status| {
+                        let style = radio::default(theme, status);
+                        radio::Style {
+                            background: style.background.scale_alpha(visibility),
+                            dot_color: style.dot_color.scale_alpha(visibility),
+                            border_color: style.border_color.scale_alpha(visibility),
+                            text_color: Some(theme.palette().text.scale_alpha(visibility)),
+                            ..style
+                        }
+                    }),
+                self.round.started().then(|| opaque(space().width(Fill).height(Fill))),
+            ]
+        };
+        let time_options = row![
+            duration_radio("15s", DurationChoice::Secs15),
+            duration_radio("30s", DurationChoice::Secs30),
+            duration_radio("60s", DurationChoice::Secs60),
+        ]
+        .spacing(32);
+
+        let top_bar = center_x(time_options);
+
         let timer = text(self.round.remaining().as_secs_f64().ceil().to_string())
             .size(FONT_SIZE)
             .font(style::MONO)
@@ -200,35 +230,23 @@ impl State {
         let header = row![timer].align_y(Alignment::Center);
 
         // Hidden during the round so they don't distract, unless hovered or selected.
-        let controls = self.controls.interpolate(0.0, 1.0, now);
         let restart_button = icon_button(
             RESTART_ICON.clone(),
             ICON_SIZE,
-            controls,
+            visibility,
             self.restart_button.highlight(now),
             Message::Restart,
             Message::RestartHovered,
             palette.muted,
         );
-        let exit_button = icon_button(
-            EXIT_ICON.clone(),
-            ICON_SIZE,
-            controls,
-            self.exit_button.highlight(now),
-            Message::Exit,
-            Message::ExitHovered,
-            palette.muted,
-        );
 
-        let content = center(
-            column![header, typing_text, center_x(restart_button)]
-                .spacing(16)
-                .max_width(TEXT_WIDTH),
-        )
-        .padding(40);
+        let main = column![header, typing_text, center_x(restart_button)]
+            .spacing(16)
+            .max_width(TEXT_WIDTH);
 
-        // Layered over the content so it sits in the window's corner without moving the text.
-        stack![content, container(exit_button).padding(CORNER_PADDING)].into()
+        let content = stack![center(main), container(top_bar).center_x(Fill).padding(40)];
+
+        content.into()
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
@@ -246,7 +264,7 @@ impl State {
     /// Whether a button is still fading, so the app keeps drawing frames.
     pub fn is_animating(&self, now: Instant) -> bool {
         [
-            &self.controls,
+            &self.controls_visibility,
             &self.restart_button.highlight,
             &self.exit_button.highlight,
         ]
@@ -256,8 +274,8 @@ impl State {
 
     /// Starts a new round with the same settings.
     fn restart(&mut self, now: Instant) {
-        self.round = Round::new(self.round.duration);
-        self.controls.go_mut(true, now);
+        self.round = Round::new(self.duration_choice.as_duration());
+        self.controls_visibility.go_mut(true, now);
         self.restart_button.set_selected(false, now);
     }
 }
@@ -279,10 +297,6 @@ fn key_to_message(event: keyboard::Event) -> Option<Message> {
             key: Key::Named(Named::Enter),
             ..
         } => Some(Message::ActivateSelected),
-        keyboard::Event::KeyPressed {
-            key: Key::Named(Named::Escape),
-            ..
-        } => Some(Message::Cancel),
         keyboard::Event::KeyPressed { modifiers, .. } if modifiers.command() => None,
         keyboard::Event::KeyPressed { text: Some(t), .. } => {
             t.chars().next().filter(|c| !c.is_control()).map(Message::Input)
