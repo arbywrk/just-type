@@ -50,6 +50,13 @@ static SETTINGS_ICON: LazyLock<svg::Handle> = LazyLock::new(|| {
     )))
 });
 
+static THEME_ICON: LazyLock<svg::Handle> = LazyLock::new(|| {
+    svg::Handle::from_memory(include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/resources/icons/palette.svg"
+    )))
+});
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Message {
     Tick,
@@ -65,6 +72,8 @@ pub enum Message {
     SelectDuration(DurationChoice),
     ShowSettings,
     SettingsHovered(bool),
+    ShowThemes,
+    ThemesHovered(bool),
 }
 
 pub enum Event {
@@ -111,6 +120,7 @@ pub struct State {
     duration_choice: DurationChoice,
     restart_button: ButtonState,
     settings_button: ButtonState,
+    theme_button: ButtonState,
     /// How long the caret takes to glide, or `None` when it jumps.
     caret_glide: Option<Duration>,
 }
@@ -122,6 +132,7 @@ impl State {
             controls_visibility: Animation::new(true).duration(CONTROLS_FADE).easing(Easing::EaseOut),
             restart_button: ButtonState::new(),
             settings_button: ButtonState::new(),
+            theme_button: ButtonState::new(),
             caret_glide,
             duration_choice: choice,
         }
@@ -177,11 +188,19 @@ impl State {
                 // or a side bar that appears, has a close button and
                 // disables the typing mode (can't type while settings
                 // are open)
-                println!("Show");
+                println!("Show Settings");
                 None
             }
             Message::SettingsHovered(hovered) => {
                 self.settings_button.set_hovered(hovered, now);
+                None
+            }
+            Message::ShowThemes => {
+                println!("Show Themes");
+                None
+            }
+            Message::ThemesHovered(hovered) => {
+                self.theme_button.set_hovered(hovered, now);
                 None
             }
         }
@@ -251,13 +270,13 @@ impl State {
             palette.muted,
         );
 
-        let top_bar = stack![right(settings).align_y(Alignment::Center), center(time_options),];
+        let header = stack![right(settings).align_y(Alignment::Center), center(time_options),];
 
         let timer = text(self.round.remaining().as_secs_f64().ceil().to_string())
             .size(FONT_SIZE)
             .font(style::MONO)
             .style(text::primary);
-        let header = row![timer].align_y(Alignment::Center);
+        let time_bar = row![timer].align_y(Alignment::Center);
 
         let restart_button = icon_button(
             RESTART_ICON.clone(),
@@ -270,11 +289,27 @@ impl State {
             palette.muted,
         );
 
-        let main = column![header, typing_text, center_x(restart_button)]
+        let main = column![time_bar, typing_text, center_x(restart_button)]
             .spacing(16)
             .max_width(TEXT_WIDTH);
 
-        let content = stack![center(main), container(top_bar).center_x(Fill).padding(40)];
+        let theme_button = icon_button(
+            THEME_ICON.clone(),
+            ICON_SIZE,
+            false,
+            visibility,
+            self.theme_button.highlight(now),
+            Message::ShowThemes,
+            Message::ThemesHovered,
+            palette.muted,
+        );
+        let footer = row![right(theme_button)];
+
+        let content = stack![
+            center(main),
+            container(header).center_x(Fill).padding(40),
+            container(footer).align_bottom(Fill).center_x(Fill).padding(40),
+        ];
 
         content.into()
     }
@@ -297,6 +332,7 @@ impl State {
             &self.controls_visibility,
             &self.restart_button.highlight,
             &self.settings_button.highlight,
+            &self.theme_button.highlight,
         ]
         .iter()
         .any(|animation| animation.is_animating(now))
