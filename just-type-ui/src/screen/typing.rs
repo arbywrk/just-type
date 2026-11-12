@@ -9,14 +9,14 @@ use iced::{
     Subscription,
     animation::Easing,
     keyboard::{self, Key, key::Named},
-    widget::{center, center_x, column, container, opaque, radio, row, space, stack, svg, text},
+    widget::{center, center_x, column, container, opaque, radio, right, row, space, stack, svg, text},
 };
 
 use crate::{
+    components::buttons::icon_button,
+    components::typing_text::{self, TypingText},
     style::{self, BODY_SIZE},
     theme::Palette,
-    typing_text::{self, TypingText},
-    widget::icon_button,
 };
 
 use just_type_core::{
@@ -28,8 +28,6 @@ use just_type_core::{
 const FONT_SIZE: f32 = 28.0;
 /// Same size as the text, so the icons' strokes are as thick as the font's.
 const ICON_SIZE: f32 = FONT_SIZE;
-/// Distance of the exit button from the window's corner.
-const CORNER_PADDING: f32 = 16.0;
 /// Max width of the typing area. Lines wrap to fit it.
 const TEXT_WIDTH: f32 = 820.0;
 const VISIBLE_LINES: usize = 3;
@@ -38,11 +36,17 @@ const CONTROLS_FADE: Duration = Duration::from_millis(300);
 /// How long a button takes to light up when hovered or selected.
 const HIGHLIGHT_FADE: Duration = Duration::from_millis(150);
 
-/// Loaded once and reused, instead of on every redraw.
 static RESTART_ICON: LazyLock<svg::Handle> = LazyLock::new(|| {
     svg::Handle::from_memory(include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/resources/icons/arrow-clockwise-bold.svg"
+    )))
+});
+
+static SETTINGS_ICON: LazyLock<svg::Handle> = LazyLock::new(|| {
+    svg::Handle::from_memory(include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/resources/icons/gear.svg"
     )))
 });
 
@@ -59,6 +63,8 @@ pub enum Message {
     ActivateSelected,
     Restart,
     SelectDuration(DurationChoice),
+    ShowSettings,
+    SettingsHovered(bool),
 }
 
 pub enum Event {
@@ -104,8 +110,7 @@ pub struct State {
     controls_visibility: Animation<bool>,
     duration_choice: DurationChoice,
     restart_button: ButtonState,
-    /// The exit button can't be selected with Tab, so it is only ever hovered.
-    exit_button: ButtonState,
+    settings_button: ButtonState,
     /// How long the caret takes to glide, or `None` when it jumps.
     caret_glide: Option<Duration>,
 }
@@ -116,7 +121,7 @@ impl State {
             round: Round::new(choice.as_duration()),
             controls_visibility: Animation::new(true).duration(CONTROLS_FADE).easing(Easing::EaseOut),
             restart_button: ButtonState::new(),
-            exit_button: ButtonState::new(),
+            settings_button: ButtonState::new(),
             caret_glide,
             duration_choice: choice,
         }
@@ -164,6 +169,20 @@ impl State {
                 }
 
                 self.select(choice, now)
+            }
+            Message::ShowSettings => {
+                // Settings should be a dropdown menu
+                // so the user can see the visual changes he does in real time
+                // (Take into account smaller sizes of the app window)
+                // or a side bar that appears, has a close button and
+                // disables the typing mode (can't type while settings
+                // are open)
+                println!("Show");
+                None
+            }
+            Message::SettingsHovered(hovered) => {
+                self.settings_button.set_hovered(hovered, now);
+                None
             }
         }
     }
@@ -221,7 +240,18 @@ impl State {
         ]
         .spacing(32);
 
-        let top_bar = center_x(time_options);
+        let settings = icon_button(
+            SETTINGS_ICON.clone(),
+            ICON_SIZE,
+            false,
+            visibility,
+            self.settings_button.highlight(now),
+            Message::ShowSettings,
+            Message::SettingsHovered,
+            palette.muted,
+        );
+
+        let top_bar = stack![right(settings).align_y(Alignment::Center), center(time_options),];
 
         let timer = text(self.round.remaining().as_secs_f64().ceil().to_string())
             .size(FONT_SIZE)
@@ -229,10 +259,10 @@ impl State {
             .style(text::primary);
         let header = row![timer].align_y(Alignment::Center);
 
-        // Hidden during the round so they don't distract, unless hovered or selected.
         let restart_button = icon_button(
             RESTART_ICON.clone(),
             ICON_SIZE,
+            true,
             visibility,
             self.restart_button.highlight(now),
             Message::Restart,
@@ -266,7 +296,7 @@ impl State {
         [
             &self.controls_visibility,
             &self.restart_button.highlight,
-            &self.exit_button.highlight,
+            &self.settings_button.highlight,
         ]
         .iter()
         .any(|animation| animation.is_animating(now))

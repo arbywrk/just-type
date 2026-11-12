@@ -1,4 +1,4 @@
-//! Fonts, colors and sizes shared by every screen.
+//! Fonts and sizes shared by every screen.
 
 use iced::Font;
 

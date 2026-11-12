@@ -3,12 +3,11 @@
 // prevent Windows from opening a terminal when running the app.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod components;
 mod game;
 mod screen;
 mod style;
 mod theme;
-mod typing_text;
-mod widget;
 
 use crate::game::Game;
 

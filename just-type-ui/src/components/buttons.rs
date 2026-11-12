@@ -1,0 +1,65 @@
+use iced::{
+    Border, Color, Element, Theme,
+    widget::{button, mouse_area, svg},
+};
+
+/// The color `t` of the way from `from` to `to`.
+fn mix(from: Color, to: Color, t: f32) -> Color {
+    let lerp = |a: f32, b: f32| a + (b - a) * t;
+    Color {
+        r: lerp(from.r, to.r),
+        g: lerp(from.g, to.g),
+        b: lerp(from.b, to.b),
+        a: lerp(from.a, to.a),
+    }
+}
+
+/// A square icon button with a rounded border, muted unless highlighted.
+///
+/// `visibility` and `highlight` go from 0 to 1, so both can fade. A hidden button still
+/// shows while highlighted. iced doesn't give the icon the button's hover status, so the
+/// caller tracks hover through `on_hover` and passes it back in as `highlight`.
+pub fn icon_button<'a, Message: Clone + 'a>(
+    icon: svg::Handle,
+    size: f32,
+    borders: bool,
+    visibility: f32,
+    highlight: f32,
+    on_press: Message,
+    on_hover: impl Fn(bool) -> Message,
+    muted: Color,
+) -> Element<'a, Message> {
+    let opacity = visibility.max(highlight);
+    let color = move |theme: &Theme| mix(muted, theme.palette().primary, highlight);
+
+    let icon = svg(icon)
+        .width(size)
+        .height(size)
+        // The svg color filter ignores alpha, so it has to be hidden with opacity.
+        .opacity(opacity)
+        .style(move |theme: &Theme, _| svg::Style {
+            color: Some(color(theme)),
+        });
+
+    let button = button(icon)
+        .padding(super::ICON_PADDING)
+        .style(move |theme: &Theme, _| {
+            let color = color(theme).scale_alpha(opacity);
+            button::Style {
+                background: None,
+                text_color: color,
+                border: Border {
+                    color,
+                    width: if borders { 1.0 } else { 0.0 },
+                    radius: super::CORNER_RADIUS.into(),
+                },
+                ..button::Style::default()
+            }
+        })
+        .on_press(on_press);
+
+    mouse_area(button)
+        .on_enter(on_hover(true))
+        .on_exit(on_hover(false))
+        .into()
+}
