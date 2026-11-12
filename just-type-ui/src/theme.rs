@@ -1,4 +1,4 @@
-use iced::Color;
+use iced::{Color, color};
 use just_type_core::settings::theme::Theme;
 
 #[derive(Debug, Clone, Copy)]
@@ -11,24 +11,26 @@ pub struct Palette {
     pub muted: Color,
 }
 
+/// The colors are picked per theme, because text needs a darker shade on a light
+/// background and a lighter one on a dark background to stay readable.
 pub fn palette(theme: Theme) -> Palette {
-    let from_iced = |theme: iced::Theme| {
-        let palette = theme.palette();
-        let extended_palette = theme.extended_palette();
-
-        Palette {
-            background: palette.background,
-            text: palette.text,
-            accent: palette.primary,
-            correct: palette.success,
-            wrong: palette.danger,
-            muted: extended_palette.background.strong.color,
-        }
-    };
-
     match theme {
-        Theme::Light => from_iced(iced::Theme::Light),
-        Theme::Dark => from_iced(iced::Theme::Dark),
+        Theme::Light => Palette {
+            background: color!(0xffffff),
+            text: color!(0x000000),
+            accent: color!(0x5865f2),
+            correct: color!(0x2b8a3e),
+            wrong: color!(0xc3423f),
+            muted: color!(0xcecece),
+        },
+        Theme::Dark => Palette {
+            background: color!(0x2b2d31),
+            text: color!(0xe6e6e6),
+            accent: color!(0x5865f2),
+            correct: color!(0x69db7c),
+            wrong: color!(0xc3423f),
+            muted: color!(0x50545d),
+        },
     }
 }
 
