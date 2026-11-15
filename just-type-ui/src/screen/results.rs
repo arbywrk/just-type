@@ -12,16 +12,9 @@ use just_type_core::score::{Records, Score};
 
 const STAT_SIZE: f32 = 56.0;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Selected {
-    Restart,
-}
-
 pub struct State {
     score: Score,
     records: Option<Records>,
-    /// Nothing is selected until Tab is pressed.
-    selected: Option<Selected>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -36,11 +29,7 @@ pub enum Event {
 
 impl State {
     pub fn new(score: Score, records: Option<Records>) -> Self {
-        Self {
-            score,
-            records,
-            selected: None,
-        }
+        Self { score, records }
     }
 
     pub fn update(&mut self, message: Message) -> Option<Event> {
