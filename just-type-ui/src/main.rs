@@ -3,8 +3,9 @@
 // prevent Windows from opening a terminal when running the app.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod components;
+mod component;
 mod game;
+mod overlay;
 mod screen;
 mod style;
 mod theme;

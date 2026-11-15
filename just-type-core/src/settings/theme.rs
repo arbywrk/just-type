@@ -6,3 +6,15 @@ pub enum Theme {
     Light,
     Dark,
 }
+
+impl Theme {
+    /// Every theme, in the order they are listed.
+    pub const ALL: [Theme; 2] = [Theme::Light, Theme::Dark];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Theme::Light => "light",
+            Theme::Dark => "dark",
+        }
+    }
+}

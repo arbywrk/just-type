@@ -13,8 +13,10 @@ use iced::{
 };
 
 use crate::{
-    components::buttons::icon_button,
-    components::typing_text::{self, TypingText},
+    component::{
+        buttons::icon_button,
+        typing_text::{self, TypingText},
+    },
     style::{self, BODY_SIZE},
     theme::Palette,
 };
@@ -79,6 +81,7 @@ pub enum Message {
 pub enum Event {
     Finished(Score),
     SelectDuration(DurationChoice),
+    ShowThemes,
 }
 
 /// Hover and keyboard selection of a button, with its highlight fading in and out.
@@ -196,8 +199,11 @@ impl State {
                 None
             }
             Message::ShowThemes => {
-                println!("Show Themes");
-                None
+                // A round can't keep running behind the theme picker.
+                if self.round.started() {
+                    self.restart(now);
+                }
+                Some(Event::ShowThemes)
             }
             Message::ThemesHovered(hovered) => {
                 self.theme_button.set_hovered(hovered, now);

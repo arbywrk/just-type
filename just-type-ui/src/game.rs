@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant, SystemTime};
 
 use iced::{
-    Animation, Element, Length, Subscription, Theme,
+    Animation, Element, Length, Subscription, Task, Theme,
     animation::Easing,
     keyboard::{self, Key},
     widget::{container, space, stack},
@@ -9,6 +9,7 @@ use iced::{
 };
 
 use crate::{
+    overlay::theme_picker,
     screen::{Screen, results, typing},
     theme::palette,
 };
@@ -28,10 +29,13 @@ pub enum Message {
     Frame(Instant),
     Typing(typing::Message),
     Results(results::Message),
+    ThemePicker(theme_picker::Message),
 }
 
 pub struct Game {
     screen: Screen,
+    /// Open on top of the screen, which ignores all input meanwhile.
+    theme_picker: Option<theme_picker::State>,
     session: Session,
     /// When the current frame is drawn. Only kept up to date while something is animating.
     now: Instant,
@@ -48,13 +52,14 @@ impl Game {
                 session.settings().gameplay.duration,
                 session.settings().appearance.caret_glide(),
             ))),
+            theme_picker: None,
             session,
             now: Instant::now(),
             screen_fade: Animation::new(true),
         }
     }
 
-    pub fn update(&mut self, message: Message) {
+    pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ZoomIn => self
                 .session
@@ -79,6 +84,11 @@ impl Game {
                             self.session
                                 .change_settings(|settings| settings.gameplay.duration = choice);
                         }
+                        typing::Event::ShowThemes => {
+                            let (picker, task) = theme_picker::State::new();
+                            self.theme_picker = Some(picker);
+                            return task.map(Message::ThemePicker);
+                        }
                     }
                 }
             }
@@ -91,7 +101,22 @@ impl Game {
                     }
                 }
             }
+            Message::ThemePicker(message) => {
+                if let Some(picker) = &mut self.theme_picker {
+                    match picker.update(message) {
+                        theme_picker::Action::None => {}
+                        theme_picker::Action::Run(task) => return task.map(Message::ThemePicker),
+                        theme_picker::Action::Pick(theme) => {
+                            self.session
+                                .change_settings(|settings| settings.appearance.theme = theme);
+                            self.theme_picker = None;
+                        }
+                        theme_picker::Action::Close => self.theme_picker = None,
+                    }
+                }
+            }
         }
+        Task::none()
     }
 
     pub fn view(&self) -> Element<'_, Message> {
@@ -110,7 +135,12 @@ impl Game {
             .height(Length::Fill)
             .style(move |theme: &Theme| container::background(theme.palette().background.scale_alpha(cover)));
 
-        stack![screen, cover].into()
+        let picker = self
+            .theme_picker
+            .as_ref()
+            .map(|picker| picker.view(palette).map(Message::ThemePicker));
+
+        stack![screen, cover, picker].into()
     }
 
     pub fn scale_factor(&self) -> f32 {
@@ -133,9 +163,11 @@ impl Game {
             _ => None,
         });
 
-        let screen = match &self.screen {
-            Screen::Typing(state) => state.subscription().map(Message::Typing),
-            Screen::Results(_) => Subscription::none(),
+        // The picker takes control over the keyboard when its shown.
+        let screen = match (&self.theme_picker, &self.screen) {
+            (Some(picker), _) => picker.subscription().map(Message::ThemePicker),
+            (None, Screen::Typing(state)) => state.subscription().map(Message::Typing),
+            (None, Screen::Results(_)) => Subscription::none(),
         };
 
         // Frames are only needed while something moves, so the app is idle otherwise.
